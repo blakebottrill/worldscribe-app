@@ -1,52 +1,61 @@
-import React, { useState, useCallback } from 'react';
-import TiptapEditor from './MarkdownEditor'; // Import the new Tiptap wrapper
+import React, { useState, useEffect, useRef } from 'react';
+import MarkdownEditor from './MarkdownEditor'; // Assuming this holds Tiptap
 
-const ArticleEditor = ({ initialData = { title: '', body: '', tags: '' }, articles, onSave, onCancel }) => {
-  const [title, setTitle] = useState(initialData.title);
-  // Assume body is HTML for now, will handle conversion later
-  const [bodyHtml, setBodyHtml] = useState(initialData.body || ''); 
-  const [tags, setTags] = useState(initialData.tags);
+// Accept articles and onShowMentionLinkModal
+const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionLinkModal }) => {
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [tags, setTags] = useState('');
+  const editorRef = useRef(null); // Ref to access editor instance if needed elsewhere
 
-  // Renamed handler
-  const handleBodyHtmlChange = useCallback((html) => {
-    setBodyHtml(html);
-  }, []);
+  useEffect(() => {
+    if (initialData) {
+      setTitle(initialData.title || '');
+      setBody(initialData.body || '');
+      setTags(initialData.tags || '');
+    }
+  }, [initialData]);
 
   const handleSave = () => {
-    // Basic validation: Check if body is empty (ignoring empty tags like <p></p>)
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = bodyHtml;
-    const bodyText = tempDiv.textContent || tempDiv.innerText || "";
+    // Ensure body state reflects latest editor content if needed?
+    // Might need a way for MarkdownEditor to update body state on change.
+    onSave({ title, body, tags });
+  };
 
-    if (!title.trim() || !bodyText.trim()) {
-      alert('Title and Body are required.'); 
-      return;
-    }
-    onSave({ 
-      title: title.trim(), 
-      body: bodyHtml, // Pass HTML body back up
-      tags 
-    });
+  const handleBodyChange = (newBody) => {
+    setBody(newBody);
   };
 
   return (
-    <div style={{ border: '1px solid #ccc', padding: '20px', margin: '20px 0' }}>
-      <h3>Create / Edit Article</h3>
+    <div style={{ border: '1px solid #ccc', padding: '20px' }}>
+      <h3>{initialData?._id ? 'Edit Article' : 'Create New Article'}</h3>
+      {/* Title Input */}
       <div style={{ marginBottom: '10px' }}>
         <label htmlFor="article-title" style={{ marginRight: '10px' }}>Title:</label>
-        <input 
-          type="text" 
+        <input
+          type="text"
           id="article-title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          style={{ width: 'calc(100% - 60px)' }}
           required
+          style={{ width: 'calc(100% - 60px)' }}
         />
       </div>
-      <div style={{ marginBottom: '10px' }}>
+
+      {/* Editor Component */}
+      <MarkdownEditor 
+        content={body} 
+        onChange={handleBodyChange}
+        articles={articles} // Pass articles for mention suggestions
+        onShowMentionLinkModal={onShowMentionLinkModal} // Pass modal trigger
+        ref={editorRef} // Forward ref if needed
+      />
+
+      {/* Tags Input */}
+      <div style={{ marginTop: '10px', marginBottom: '10px' }}>
         <label htmlFor="article-tags" style={{ marginRight: '10px' }}>Tags (comma-separated):</label>
-        <input 
-          type="text" 
+        <input
+          type="text"
           id="article-tags"
           value={tags}
           onChange={(e) => setTags(e.target.value)}
@@ -54,14 +63,8 @@ const ArticleEditor = ({ initialData = { title: '', body: '', tags: '' }, articl
         />
       </div>
 
-      {/* Replace SimpleMDE with TiptapEditor */}
-      <TiptapEditor 
-        content={bodyHtml} 
-        onChange={handleBodyHtmlChange} 
-        articles={articles} // Pass articles to TiptapEditor
-      />
-      
-      <div style={{ marginTop: '10px' }}>
+      {/* Action Buttons */}
+      <div style={{ marginTop: '20px' }}>
         <button onClick={handleSave} style={{ marginRight: '10px' }}>Save Article</button>
         <button onClick={onCancel}>Cancel</button>
       </div>

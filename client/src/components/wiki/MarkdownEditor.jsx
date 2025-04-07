@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { forwardRef, useImperativeHandle, useEffect } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Extension } from '@tiptap/core';
+import { Plugin, PluginKey } from '@tiptap/pm/state'; // Ensure PluginKey is imported
 import Suggestion from '@tiptap/suggestion';
 import commands from './editor/commands'; // Import our commands config
-import getMentionConfig from './editor/mentions'; // Import the mention config function
+import MentionMark from './editor/mentionMark'; // Import the new MentionMark
+// import getMentionConfig from './editor/mentions'; // No longer needed for trigger
 
 // Import additional extensions
 import TaskList from '@tiptap/extension-task-list';
@@ -17,105 +19,147 @@ import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
 
-// Restore unified SuggestionsExtension
-const SuggestionsExtension = Extension.create({
-  name: 'suggestions',
+// Extension 1: Slash Commands
+const SlashCommandsExtension = Extension.create({
+  name: 'slashCommands',
+
+  addProseMirrorPlugins() {
+    return [
+      Suggestion({
+        editor: this.editor,
+        char: '/',
+        command: ({ editor, range, props }) => {
+          props.command({ editor, range, props });
+        },
+        items: commands.items,
+        render: commands.render,
+        // Explicitly provide a unique key
+        pluginKey: new PluginKey('slashSuggestion'), 
+      }),
+    ];
+  },
+});
+
+// Extension 2: Mentions - Rewritten to use a custom plugin trigger
+const MentionsExtension = Extension.create({
+  name: 'mentionsTrigger', // Renamed for clarity
 
   addOptions() {
     return {
-      articles: [],
+      // articles: [], // No longer needed in this extension itself
+      onShowMentionLinkModal: () => { console.error('onShowMentionLinkModal not provided to MentionsExtension'); },
     };
   },
 
   addProseMirrorPlugins() {
-    const articles = this.options.articles;
-    const mentionConfig = getMentionConfig(articles);
+    const extensionOptions = this.options;
 
     return [
-      // Slash command suggestion
-      Suggestion({
-        editor: this.editor, // Pass editor instance
-        char: '/', 
-        command: ({ editor, range, props }) => {
-          props.command({ editor, range, props });
+      new Plugin({
+        key: new PluginKey('mentionTriggerPlugin'), // Unique key for this plugin
+        // Use appendTransaction to check changes *after* they happen
+        appendTransaction: (transactions, oldState, newState) => {
+          // Only interested in transactions that changed the document and were not reverted
+          const docChanged = transactions.some(tr => tr.docChanged);
+          if (!docChanged) {
+            return null; // No change, no need to modify transaction
+          }
+
+          // Find the position where the change ended
+          // We look at the mapping for the first transaction that changed the doc
+          const change = transactions.find(tr => tr.docChanged);
+          if (!change) return null;
+
+          // Get the position right after the inserted text
+          const endPos = change.mapping.map(oldState.selection.head);
+          const $endPos = newState.doc.resolve(endPos);
+
+          // Check the character immediately before the cursor
+          const charBefore = newState.doc.textBetween(endPos - 1, endPos, "\ufffc", "\ufffc");
+
+          if (charBefore === '@') {
+            // Check context (optional but recommended: e.g., preceded by space?)
+            const charBeforeTrigger = newState.doc.textBetween(endPos - 2, endPos - 1, "\ufffc", "\ufffc");
+            const isStartOfNode = $endPos.parentOffset === 1;
+            const precededBySpace = /\s/.test(charBeforeTrigger);
+
+            if (isStartOfNode || precededBySpace) {
+              console.log('Mention trigger detected!');
+              // Call the modal handler. Pass the editor instance and the range of the '@' symbol.
+              // We need the editor instance. Accessing via this.editor might work directly.
+              if (this.editor?.view) { // Check if editor view is available
+                  // Schedule the modal call to run after the transaction is dispatched
+                  setTimeout(() => {
+                    extensionOptions.onShowMentionLinkModal(this.editor, { from: endPos - 1, to: endPos });
+                  }, 0);
+              } else {
+                  console.warn('Editor instance not available in mention trigger plugin yet.')
+              }
+            }
+          }
+          return null; // Don't modify the transaction itself
         },
-        items: commands.items, 
-        render: commands.render, 
-      }),
-      // Mention suggestion (Disabled due to plugin key conflict)
-      /* Suggestion({
-        editor: this.editor, // Pass editor instance
-        char: '@',
-        allow: ({ editor, range }) => true, 
-        command: ({ editor, range, props }) => {
-          editor.chain().focus().deleteRange(range).insertContent(props.title).run();
-        },
-        items: mentionConfig.items,
-        render: mentionConfig.render,
-      }), */
-    ]
+      })
+    ];
   },
-})
+});
 
-// Accept articles prop
-const TiptapEditor = ({ content, onChange, articles, placeholder = 'Start writing...' }) => {
-
-  // Log received articles
-  // console.log("TiptapEditor received articles:", articles);
-
-  // Create mention config using passed articles (No longer needed here)
-  // const mentionConfig = getMentionConfig(articles);
-
+const MarkdownEditor = forwardRef(({ content, onChange, articles, onShowMentionLinkModal, placeholder = 'Start writing...' }, ref) => {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        // StarterKit includes Blockquote, HorizontalRule
-        heading: {
-          levels: [1, 2, 3],
-        },
+        heading: { levels: [1, 2, 3] },
       }),
-      Placeholder.configure({
-        placeholder: placeholder,
-      }),
-      // Add new extensions
+      Placeholder.configure({ placeholder }),
       TaskList,
-      TaskItem.configure({
-        nested: true, // Allow nested tasks
-      }),
-      Image, // Basic image support (resizing might need more config)
-      Link.configure({
-        openOnClick: false, // Prevent clicking links in editor
-        autolink: true, // Autolink URLs
-      }),
-      Table.configure({
-        resizable: true, // Allow column resizing
-      }),
+      TaskItem.configure({ nested: true }),
+      Image,
+      Link.configure({ openOnClick: false, autolink: true }),
+      Table.configure({ resizable: true }),
       TableRow,
       TableHeader,
       TableCell,
-      
-      // Add and configure the unified SuggestionsExtension
-      SuggestionsExtension.configure({ 
-        articles: articles, 
+      SlashCommandsExtension, 
+      MentionsExtension.configure({
+        onShowMentionLinkModal: onShowMentionLinkModal,
       }),
+      MentionMark,
     ],
-    content: content, // Initial content (HTML)
+    // Initialize empty, content will be set via useEffect
+    content: '',
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML()); // Pass HTML content back up
+      onChange(editor.getHTML());
     },
     editorProps: {
       attributes: {
-        // Remove prose classes, keep basic layout/border styles
         class: 'focus:outline-none p-2 border border-gray-300 rounded min-h-[200px]',
       },
     },
   });
 
-  // Optional: Add a simple toolbar later
+  // Effect to explicitly set content when the prop changes or editor initializes
+  useEffect(() => {
+    if (!editor || !content) {
+      return; // Don't run if editor isn't ready or content is null/empty
+    }
+
+    // Avoid resetting content if it already matches (prevents cursor jumps)
+    // Compare editor.isEmpty specifically for initially empty state might be needed
+    // Or compare HTML strings carefully.
+    if (content !== editor.getHTML()) {
+        // Use JSON if possible for more reliable comparison/setting?
+        // For now, sticking with HTML.
+        console.log("Setting editor content from prop...");
+        // Set content without triggering the onUpdate callback
+        editor.commands.setContent(content, false); 
+    }
+  }, [content, editor]); // Re-run when content prop or editor instance changes
+
+  useImperativeHandle(ref, () => editor, [editor]);
 
   return (
     <EditorContent editor={editor} />
   );
-};
+});
 
-export default TiptapEditor; 
+export default MarkdownEditor; 

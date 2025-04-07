@@ -4,16 +4,6 @@ import React, { useEffect, useRef } from 'react';
 // const mentionRegex = /@([a-zA-Z0-9\s-]+)/g;
 // const preprocessMarkdown = ... 
 
-// Regex to find @Title style mentions (same as before)
-const mentionRegex = /@([a-zA-Z0-9\s-]+)/g;
-
-// Helper function to find article by title (case-insensitive)
-const findArticleByTitle = (title, articles) => {
-  if (!articles) return null; // Guard against missing articles prop
-  const normalizedTitle = title.trim().toLowerCase();
-  return articles.find(a => a.title.trim().toLowerCase() === normalizedTitle);
-};
-
 // Component receives articles and onSelectArticle again
 const ArticleView = ({ article, articles, onSelectArticle, onEdit, onDelete }) => {
   const viewStyles = {
@@ -25,82 +15,42 @@ const ArticleView = ({ article, articles, onSelectArticle, onEdit, onDelete }) =
   const contentRef = useRef(null); // Ref to access the content container DOM node
 
   useEffect(() => {
-    if (!article || !contentRef.current || !articles || !onSelectArticle) {
-      return; // Exit if no article, ref, articles list, or handler
-    }
-
     const container = contentRef.current;
+    if (!container || !articles || !onSelectArticle) return; // Guard
 
-    // Function to recursively process text nodes
-    const processNode = (node) => {
-      if (node.nodeType === Node.TEXT_NODE) {
-        const text = node.nodeValue;
-        let lastIndex = 0;
-        const replacements = [];
-
-        // Find all @mention matches in this text node
-        mentionRegex.lastIndex = 0; // Reset regex state
-        let match;
-        while ((match = mentionRegex.exec(text)) !== null) {
-          const fullMatch = match[0]; // e.g., "@Some Title"
-          const title = match[1]; // e.g., "Some Title"
-          const targetArticle = findArticleByTitle(title, articles);
-          
-          // Add text before the match
-          if (match.index > lastIndex) {
-            replacements.push(document.createTextNode(text.substring(lastIndex, match.index)));
-          }
-
-          if (targetArticle) {
-            // Create a button for valid links
-            const button = document.createElement('button');
-            button.textContent = fullMatch;
-            button.style.background = 'none';
-            button.style.border = 'none';
-            button.style.padding = '0';
-            button.style.color = '#646cff';
-            button.style.textDecoration = 'underline';
-            button.style.cursor = 'pointer';
-            button.style.font = 'inherit';
-            button.onclick = (e) => {
-              e.preventDefault(); // Prevent any default link behavior if inside <a>
-              onSelectArticle(targetArticle);
-            };
-            replacements.push(button);
-          } else {
-            // Create a span for broken links
-            const span = document.createElement('span');
-            span.textContent = fullMatch;
-            span.style.color = '#dc3545';
-            span.style.textDecoration = 'line-through';
-            replacements.push(span);
-          }
-          lastIndex = match.index + fullMatch.length;
-        }
-
-        // If any replacements were made, replace the original text node
-        if (replacements.length > 0) {
-          // Add any remaining text after the last match
-          if (lastIndex < text.length) {
-            replacements.push(document.createTextNode(text.substring(lastIndex)));
-          }
-          node.replaceWith(...replacements);
-        }
-      } else {
-        // Recursively process child nodes, avoiding nested buttons/spans we created
-        if (node.nodeName !== 'BUTTON' && node.nodeName !== 'SPAN') { 
-          Array.from(node.childNodes).forEach(processNode);
+    const handleClick = (event) => {
+      // Find the closest ancestor span with the data-mention-id attribute
+      const mentionSpan = event.target.closest('span[data-mention-id]');
+      
+      if (mentionSpan) {
+        event.preventDefault(); // Prevent any default behavior
+        const mentionId = mentionSpan.getAttribute('data-mention-id');
+        // const mentionLabel = mentionSpan.getAttribute('data-mention-label'); // Label if needed
+        
+        console.log('Clicked mention span, ID:', mentionId);
+        
+        // Find the corresponding article object using the ID
+        const targetArticle = articles.find(a => a._id === mentionId);
+        
+        if (targetArticle) {
+          console.log('Found target article:', targetArticle.title);
+          onSelectArticle(targetArticle);
+        } else {
+          console.warn('Clicked mention, but target article not found in list for ID:', mentionId);
+          // Optionally indicate a broken link visually here if needed
         }
       }
     };
 
-    // Start processing from the container (clone to avoid modifying during iteration issues)
-    const nodesToProcess = Array.from(container.childNodes);
-    nodesToProcess.forEach(processNode);
+    // Add the event listener
+    container.addEventListener('click', handleClick);
 
-    // No cleanup needed for this simple manipulation, runs on article change
+    // Cleanup: remove the event listener when component unmounts or dependencies change
+    return () => {
+      container.removeEventListener('click', handleClick);
+    };
 
-  }, [article, articles, onSelectArticle]); // Rerun when article or list changes
+  }, [article, articles, onSelectArticle]); // Rerun if article, articles list, or handler changes
 
   if (!article) {
     return <div style={viewStyles}><p>Select an article to view its content.</p></div>;

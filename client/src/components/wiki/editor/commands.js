@@ -6,58 +6,69 @@ import CommandList from './CommandList'
 // Based on Tiptap documentation example for suggestions
 export default {
   items: ({ query }) => {
-    // Basic commands for MVP
-    return [
+    const allCommands = [
       {
-        title: 'h1',
+        title: 'Heading 1',
         command: ({ editor, range }) => {
           editor.chain().focus().deleteRange(range).setNode('heading', { level: 1 }).run()
         },
       },
       {
-        title: 'h2',
+        title: 'Heading 2',
         command: ({ editor, range }) => {
           editor.chain().focus().deleteRange(range).setNode('heading', { level: 2 }).run()
         },
       },
       {
-        title: 'h3',
+        title: 'Heading 3',
         command: ({ editor, range }) => {
           editor.chain().focus().deleteRange(range).setNode('heading', { level: 3 }).run()
         },
       },
       {
-        title: 'bullet',
+        title: 'Paragraph',
+        command: ({ editor, range }) => {
+          editor.chain().focus().deleteRange(range).setNode('paragraph').run()
+        },
+      },
+      {
+        title: 'Bold',
+        command: ({ editor, range }) => {
+          editor.chain().focus().deleteRange(range).setMark('bold').run()
+        },
+      },
+      {
+        title: 'Bullet',
         command: ({ editor, range }) => {
           editor.chain().focus().deleteRange(range).toggleBulletList().run()
         },
       },
       {
-        title: 'number',
+        title: 'Number',
         command: ({ editor, range }) => {
           editor.chain().focus().deleteRange(range).toggleOrderedList().run()
         },
       },
       {
-        title: 'todo',
+        title: 'Todo',
         command: ({ editor, range }) => {
           editor.chain().focus().deleteRange(range).toggleTaskList().run()
         },
       },
       {
-        title: 'quote',
+        title: 'Quote',
         command: ({ editor, range }) => {
           editor.chain().focus().deleteRange(range).toggleBlockquote().run()
         },
       },
       {
-        title: 'divider',
+        title: 'Divider',
         command: ({ editor, range }) => {
           editor.chain().focus().deleteRange(range).setHorizontalRule().run()
         },
       },
       {
-        title: 'image',
+        title: 'Image',
         command: ({ editor, range }) => {
           const url = window.prompt('Enter image URL:');
           if (url) {
@@ -66,7 +77,7 @@ export default {
         },
       },
       {
-        title: 'link',
+        title: 'Link',
         command: ({ editor, range }) => {
           const previousUrl = editor.getAttributes('link').href;
           const url = window.prompt('Enter link URL:', previousUrl);
@@ -81,27 +92,89 @@ export default {
         },
       },
       {
-        title: 'table',
+        title: 'Table',
         command: ({ editor, range }) => {
           editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
         },
       },
       {
-        title: 'code',
+        title: 'Code',
         command: ({ editor, range }) => {
           editor.chain().focus().deleteRange(range).toggleCodeBlock().run()
         },
       },
-      /* Deferred / Future Command Ideas:
-         - Mention (@ linking, needs custom suggestion logic & data source)
-         - Secret (requires custom node/mark and likely auth integration)
-         - Auto-link (requires link detection logic)
-         - Expand (requires custom node/component)
-         - Layouts (requires complex custom nodes/components)
-         - Element (purpose unclear, excluded for now)
-         - Callout (requires custom node/component, excluded for now)
-      */
-    ].filter(item => item.title.toLowerCase().startsWith(query.toLowerCase()))
+      {
+        title: 'AI Continue',
+        command: async ({ editor, range }) => {
+          const context = editor.getText().substring(0, range.from - 1);
+          editor.chain().focus().deleteRange(range).insertContent('[🧠 Generating...]').run();
+
+          try {
+            const response = await fetch('http://localhost:5001/api/ai/generate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ context, action: 'continue' })
+            });
+            if (!response.ok) throw new Error('AI generation failed');
+            const { generatedText } = await response.json();
+            // Replace placeholder with generated text
+            editor.chain().focus().deleteRange({ from: range.from, to: range.from + 18 }).insertContent(generatedText).run();
+          } catch (error) {
+            console.error("AI Continue Error:", error);
+            editor.chain().focus().deleteRange({ from: range.from, to: range.from + 18 }).insertContent('[❌ AI Error]').run();
+          }
+        },
+        renderId: 'ai-continue'
+      },
+      {
+        title: 'AI Expand', // User selects this, then is prompted for topic
+        command: async ({ editor, range }) => {
+          // Prompt for the topic after selecting the command
+          const topic = window.prompt("Enter the topic to expand on:");
+
+          if (!topic || topic.trim() === '') { // Handle cancel or empty input
+            editor.chain().focus().deleteRange(range).run(); // Just delete the command trigger
+            alert("AI Expand cancelled or topic missing.");
+            return;
+          }
+
+          const context = editor.getText().substring(0, range.from -1); // Text before command trigger
+          const placeholder = `[🧠 Expanding on ${topic}...]`;
+          editor.chain().focus().deleteRange(range).insertContent(placeholder).run();
+          const placeholderLength = placeholder.length;
+          
+          try {
+            const response = await fetch('http://localhost:5001/api/ai/generate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ context, action: 'expand', topic: topic.trim() })
+            });
+             if (!response.ok) throw new Error('AI generation failed');
+            const { generatedText } = await response.json();
+            editor.chain().focus().deleteRange({ from: range.from, to: range.from + placeholderLength }).insertContent(generatedText).run();
+          } catch (error) {
+             console.error("AI Expand Error:", error);
+             editor.chain().focus().deleteRange({ from: range.from, to: range.from + placeholderLength }).insertContent('[❌ AI Error]').run();
+          }
+        },
+        renderId: 'ai-expand'
+      },
+    ];
+
+    // Filter commands based on query
+    if (!query) {
+       // Show all non-AI commands by default? Or maybe just core ones?
+       return allCommands.filter(c => !c.renderId?.startsWith('ai-'));
+    }
+
+    // Special handling for /ai-expand to keep it visible while typing topic
+    if (query.startsWith('ai-expand')) {
+        return allCommands.filter(item => item.renderId === 'ai-expand');
+    }
+
+    return allCommands.filter(item => 
+        item.title.toLowerCase().startsWith(query.toLowerCase())
+    ).slice(0, 10);
   },
 
   render: () => {

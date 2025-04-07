@@ -13,9 +13,9 @@ const PinSchema = new Schema({
   article: {
     type: Schema.Types.ObjectId,
     ref: 'Article', // Link to the Article model
-    required: true,
+    // required: true, // REMOVED - Link is now optional
   }
-}, { _id: false }); // Don't create separate IDs for pins within the array
+}); // REMOVED , { _id: false } - Pins will now have their own _id
 
 const MapSchema = new Schema({
   title: {

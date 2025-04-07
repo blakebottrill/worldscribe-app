@@ -7,9 +7,7 @@ import App from './App.jsx'
 import 'tippy.js/dist/tippy.css'; // Add Tippy.js base CSS
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>,
+  <BrowserRouter>
+    <App />
+  </BrowserRouter>
 )

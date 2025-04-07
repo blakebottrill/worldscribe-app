@@ -20,6 +20,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Define Routes
 app.use('/api/articles', require('./routes/articles'));
 app.use('/api/maps', require('./routes/maps')); // Add map routes
+app.use('/api/timeline', require('./routes/timelineEvents')); // Add timeline routes
+app.use('/api/ai', require('./routes/ai')); // Add AI routes
 // TODO: Add other routes (timeline, auth)
 
 // Basic Route

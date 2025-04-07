@@ -189,3 +189,17 @@ nav a:hover, nav button:hover {
 .tiptap-rendered-content th {
   background-color: #444; /* Darker header bg */
 }
+
+/* Update styles for Tiptap Mention Marks to be more general */
+span[data-mention-id] {
+  color: #809fff; /* A slightly lighter blue for dark mode visibility */
+  cursor: pointer;
+  font-weight: 500; /* Optional: Make them slightly bolder */
+  padding: 1px 2px; /* Minimal padding */
+  border-radius: 3px;
+}
+
+span[data-mention-id]:hover {
+  text-decoration: underline;
+  color: #a0bfff; /* Slightly lighter on hover */
+}
