@@ -1,0 +1,16 @@
+/* client/src/components/layout/AppLayout.css */
+.app-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden; /* Prevent scrolling on the main layout */
+}
+
+.main-content {
+  flex-grow: 1;
+  overflow-y: auto; /* Allow scrolling within the main content area */
+  /* Add padding later if needed, pages should manage their own */
+  background-color: var(--background-color-main, #f8f9fa); /* Light background */
+}
+
+/* Define CSS variables for colors in index.css or here */
+/* Moved color variables to index.css to avoid duplication */ 

@@ -1,38 +1,30 @@
 import React from 'react';
+import './ArticleList.css'; // Keep CSS for item styling
 
-const ArticleList = ({ articles, onSelectArticle, selectedArticleId }) => {
-  const listStyles = {
-    listStyle: 'none',
-    padding: 0,
-    margin: 0,
-    width: '200px', // Fixed width for the list
-    borderRight: '1px solid #ccc',
-    height: 'calc(100vh - 150px)', // Adjust height as needed
-    overflowY: 'auto'
-  };
-
-  const itemStyles = {
-    padding: '10px',
-    cursor: 'pointer',
-    borderBottom: '1px solid #eee',
-  };
-
-  const selectedItemStyles = {
-    ...itemStyles,
-    backgroundColor: '#e0e0e0',
-    fontWeight: 'bold',
-  };
+// Simplified component: receives articles and handler, renders list items.
+const ArticleList = ({ articles, selectedArticleId, onSelectArticle }) => {
+  
+  // If no articles match search/filters (after loading), show message
+  if (articles.length === 0) {
+    return <p className="no-articles-message">No articles found.</p>;
+  }
 
   return (
-    <ul style={listStyles}>
-      {articles.length === 0 && <li style={itemStyles}>No articles found.</li>}
+    <ul className="article-list"> {/* Use class instead of inline style */} 
       {articles.map(article => (
         <li 
           key={article._id} 
-          style={article._id === selectedArticleId ? selectedItemStyles : itemStyles}
-          onClick={() => onSelectArticle(article)}
+          className={`article-list-item ${selectedArticleId === article._id ? 'selected' : ''}`}
         >
-          {article.title}
+          {/* Make the whole item clickable */}
+          <button onClick={() => onSelectArticle(article)} className="article-list-button">
+            <span className="article-title">{article.title}</span>
+            {/* Optional: Add metadata like tags or updated date */} 
+            {article.tags && article.tags.length > 0 && (
+               <span className="article-tags">{article.tags.join(', ')}</span>
+            )}
+             <span className="article-date">{new Date(article.updatedAt || article.createdAt).toLocaleDateString()}</span>
+          </button>
         </li>
       ))}
     </ul>

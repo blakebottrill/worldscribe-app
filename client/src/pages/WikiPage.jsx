@@ -6,6 +6,7 @@ import ArticleEditor from '../components/wiki/ArticleEditor';
 import ArticleLinkModal from '../components/common/ArticleLinkModal';
 // import PinEditModal from '../components/atlas/PinEditModal'; // Remove this leftover import
 // import MarkdownEditor from '../components/wiki/MarkdownEditor'; // We'll add this later
+import './WikiPage.css';
 
 const WikiPage = () => {
   const location = useLocation();
@@ -16,7 +17,7 @@ const WikiPage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editingArticleData, setEditingArticleData] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedTemplate, setSelectedTemplate] = useState('npc'); // Default template
+  const [selectedTemplate, setSelectedTemplate] = useState('npc');
   const [userPrompt, setUserPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showEditorLinkModal, setShowEditorLinkModal] = useState(false);
@@ -274,102 +275,97 @@ const WikiPage = () => {
   };
 
   return (
-    <div className="wiki-page-container">
-      <div className="wiki-sidebar">
-        {/* Search and Add New Button */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <input 
-            type="text" 
-            placeholder="Search articles..." 
-            value={searchTerm} 
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ width: 'calc(100% - 110px)', marginRight: '10px' }} // Adjust width
-          />
-          <button onClick={handleAddNewClick} disabled={isEditing}>+ New Article</button>
-        </div>
-
-        {/* AI Generation Section */} 
-        <div style={{ border: '1px solid #444', padding: '10px', marginBottom: '1rem', borderRadius: '4px' }}>
-          <h4>Generate Article (AI)</h4>
-          <select 
-            value={selectedTemplate} 
-            onChange={(e) => setSelectedTemplate(e.target.value)}
-            style={{ width: '100%', marginBottom: '5px' }} 
-            disabled={isGenerating}
-          >
-            <option value="npc">NPC</option>
-            <option value="location">Location</option>
-            {/* Add more template types later */}
-          </select>
+    <div className="wiki-page-layout">
+      {/* Left Pane: Search, Tabs, AI Gen, List */}
+      <div className="wiki-left-pane">
+        <div className="wiki-search-bar">
           <input 
             type="text"
-            placeholder="Brief prompt (e.g., Dwarf blacksmith, Haunted forest)" 
+            placeholder="Search articles..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          {/* Consider adding a clear button */}
+        </div>
+
+        {/* AI Generation Section - Moved here */}
+        <div className="ai-generation-section">
+          <h4>Generate Article (AI)</h4>
+          <select 
+             value={selectedTemplate} 
+             onChange={e => setSelectedTemplate(e.target.value)} 
+             style={{ marginBottom: '10px', width: '100%' }}
+          >
+             <option value="npc">NPC</option>
+             <option value="location">Location</option>
+             <option value="item">Item</option>
+             <option value="event">Event</option>
+             {/* Add more templates as needed */}
+          </select>
+          <textarea
+            placeholder={`Brief prompt (e.g., ${selectedTemplate === 'npc' ? 'Dwarf blacksmith, Haunted forest' : 'Describe the location...'})`}
             value={userPrompt}
             onChange={(e) => setUserPrompt(e.target.value)}
-            style={{ width: '100%', marginBottom: '5px' }}
-            disabled={isGenerating}
+            rows={3}
+            style={{ marginBottom: '10px', width: '100%' }}
           />
-          <button 
-            onClick={handleGenerateFromTemplate} 
-            disabled={isGenerating} 
-            style={{ width: '100%' }}
-          >
+          <button onClick={handleGenerateFromTemplate} disabled={isGenerating || !userPrompt} style={{width: '100%'}}>
             {isGenerating ? 'Generating...' : 'Generate'}
           </button>
         </div>
+        
+        <div className="wiki-article-list-container">
+           {isLoading && <p>Loading articles...</p>}
+           {error && <p className="error-message">Error: {error}</p>}
+           {!isLoading && !error && (
+             <ArticleList 
+               articles={filteredArticles} 
+               selectedArticleId={selectedArticle?._id} 
+               onSelectArticle={handleSelectArticle} 
+             />
+           )}
+        </div>
 
-        {/* Article List */}
-        {!isEditing && isLoading ? (
-          <p>Loading articles...</p>
-        ) : !isEditing && (
-          <div style={{ display: 'flex', gap: '20px' }}>
-            <ArticleList 
-              articles={filteredArticles}
-              onSelectArticle={handleSelectArticle} 
-              selectedArticleId={selectedArticle?._id}
-            />
-            {selectedArticle ? (
-              <ArticleView 
-                article={selectedArticle} 
-                articles={articles}
-                onSelectArticle={handleSelectArticle}
-                onEdit={handleEditClick} 
-                onDelete={handleDeleteClick}
-              />
-            ) : (
-              <div style={{ flexGrow: 1, padding: '10px 20px' }}>
-                <p>Select an article to view its content.</p>
-              </div>
-            )}
-            {/* Placeholder for future editor integration */}
-            {/* <MarkdownEditor /> */}
+        <div className="wiki-left-pane-footer">
+           <button onClick={handleAddNewClick} style={{width: '100%'}}>+ New Article</button>
+        </div>
+
+      </div>
+
+      {/* Right Pane: View/Edit Article or Welcome Message */}
+      <div className="wiki-right-pane">
+        {isEditing ? (
+          <ArticleEditor 
+            key={editingArticleData?._id || 'new'} // Add key for re-mounting on edit
+            initialData={editingArticleData}
+            articles={articles} // Pass for mentions
+            onSave={handleSaveArticle} 
+            onCancel={handleCancelEdit}
+            onShowMentionLinkModal={handleShowEditorLinkModal}
+          />
+        ) : selectedArticle ? (
+          <ArticleView 
+            article={selectedArticle} 
+            articles={articles} // Pass for link resolution
+            onSelectArticle={handleSelectArticle} // Allow clicking mentions
+            onEdit={handleEditClick} 
+            onDelete={handleDeleteClick}
+          />
+        ) : (
+          <div className="welcome-message">
+            <h2>Welcome to Worldscribe</h2>
+            <p>Select an article from the sidebar or create a new one to get started with your worldbuilding journey.</p>
           </div>
         )}
       </div>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      {isEditing && editingArticleData && (
-        <ArticleEditor 
-          initialData={editingArticleData}
-          articles={articles}
-          onSave={handleSaveArticle} 
-          onCancel={handleCancelEdit}
-          onShowMentionLinkModal={handleShowEditorLinkModal}
-        />
-      )}
 
-      {/* Render Article Link Modal for Editor Mentions */}
+      {/* Modal remains outside the main layout panes */}
       {showEditorLinkModal && (
         <ArticleLinkModal
           articles={articles} 
-          currentArticleId={null} // No current link when triggering with @
+          currentArticleId={null}
           onSelectArticle={handleEditorModalSelect}
-          onClose={() => {
-            setShowEditorLinkModal(false);
-            setEditorLinkRange(null);
-            setEditorInstance(null);
-            // Maybe insert placeholder or delete range if modal closed without selection?
-            // editorInstance?.chain().focus().deleteRange(editorLinkRange).run(); 
-          }} 
+          onClose={() => { setShowEditorLinkModal(false); /* ... other cleanup */ }}
         />
       )}
     </div>

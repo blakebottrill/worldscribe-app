@@ -1,0 +1,129 @@
+/* client/src/pages/WikiPage.css */
+
+.wiki-page-layout {
+  display: flex;
+  height: 100%; /* Fill height within main-content */
+}
+
+.wiki-left-pane {
+  width: 300px; /* Adjust width as needed */
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  height: 100%; 
+  box-sizing: border-box;
+  background-color: #fff; /* White background for the list area */
+}
+
+.wiki-right-pane {
+  flex-grow: 1;
+  padding: 1.5rem 2rem; /* Add padding to content area */
+  overflow-y: auto; /* Allow scrolling if content overflows */
+  height: 100%; 
+  box-sizing: border-box;
+  text-align: left; /* Align text left in view/edit area */
+}
+
+.wiki-search-bar {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.wiki-search-bar input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.wiki-tabs {
+  display: flex;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.wiki-tabs button {
+  flex: 1;
+  padding: 0.5rem;
+  border: none;
+  background-color: transparent;
+  color: var(--text-color-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-weight: 500;
+  border-radius: 0; /* Remove button radius */
+}
+
+.wiki-tabs button:hover {
+  color: var(--text-color-primary);
+}
+
+.wiki-tabs button.active {
+  color: var(--link-color);
+  border-bottom-color: var(--link-color);
+  font-weight: 600;
+}
+
+.wiki-tabs button:disabled {
+  color: #adb5bd;
+  cursor: not-allowed;
+}
+
+.ai-generation-section {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  background-color: #f8f9fa; /* Slightly different bg */
+}
+
+.ai-generation-section h4 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.wiki-article-list-container {
+  flex-grow: 1;
+  overflow-y: auto;
+}
+
+/* Style ArticleList component specifically if needed */
+.article-list {
+  /* list-style: none; */ /* Move from ArticleList component */
+  /* padding: 0; */
+  /* margin: 0; */
+}
+
+.article-list-item button {
+  /* Styles for list items from ArticleList */
+}
+
+.wiki-left-pane-footer {
+  padding: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.welcome-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  color: var(--text-color-secondary);
+}
+
+.welcome-message h2 {
+  color: var(--text-color-primary);
+  margin-bottom: 0.5rem;
+}
+
+.error-message {
+  color: #dc3545; /* Bootstrap danger color */
+  padding: 1rem;
+}
+
+/* Adjust ArticleView/Editor padding if needed */
+.wiki-right-pane .article-view-container, /* Assuming ArticleView has a container */
+.wiki-right-pane .article-editor-container { /* Assuming ArticleEditor has a container */
+  /* padding: 0; */ /* Remove padding if right-pane handles it */
+} 

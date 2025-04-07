@@ -7,6 +7,11 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'; // Ensure PluginKey is imp
 import Suggestion from '@tiptap/suggestion';
 import commands from './editor/commands'; // Import our commands config
 import MentionMark from './editor/mentionMark'; // Import the new MentionMark
+import DetailsNode from './editor/nodes/detailsNode'; // Import Details
+import SummaryNode from './editor/nodes/summaryNode'; // Import Summary
+import DetailsContentNode from './editor/nodes/detailsContentNode'; // Import DetailsContent
+import ColumnLayoutNode from './editor/nodes/columnLayoutNode'; // Import ColumnLayout
+import ColumnNode from './editor/nodes/columnNode'; // Import Column
 // import getMentionConfig from './editor/mentions'; // No longer needed for trigger
 
 // Import additional extensions
@@ -124,6 +129,11 @@ const MarkdownEditor = forwardRef(({ content, onChange, articles, onShowMentionL
         onShowMentionLinkModal: onShowMentionLinkModal,
       }),
       MentionMark,
+      DetailsNode,      
+      SummaryNode,      
+      DetailsContentNode,
+      ColumnLayoutNode,
+      ColumnNode,
     ],
     // Initialize empty, content will be set via useEffect
     content: '',

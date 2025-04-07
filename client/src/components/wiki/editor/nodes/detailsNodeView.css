@@ -1,0 +1,33 @@
+/* Basic styling for Details Node View in the editor */
+
+/* Style the wrapper - uses <details> tag */
+[data-details-node] {
+  border: 1px solid #555; /* Darker border for dark theme */
+  border-radius: 4px;
+  margin: 1em 0;
+  padding: 0.5em;
+  /* Remove background-color: #f9f9f9; */
+  color: inherit; /* Ensure text color inherits */
+}
+
+/* Style the summary part */
+[data-details-node] > [data-summary-content] {
+  cursor: pointer;
+  font-weight: bold;
+  list-style-position: inside; /* Ensure marker is inside */
+  color: #e0e0e0; /* Explicit light color for debugging (remove later) */
+  /* Use Tiptap\'s contentEditable=false? Or rely on default */
+}
+
+/* Style the content area - uses <div> tag */
+[data-details-node] > [data-details-content] {
+  margin-top: 0.5em;
+  padding-left: 1.5em; /* Indent content slightly */
+  display: none; /* Hide content by default */
+  color: #c0c0c0; /* Explicit slightly dimmer color for debugging (remove later) */
+}
+
+/* Show content when the wrapper details node has the \'open\' attribute */
+[data-details-node][open] > [data-details-content] {
+  display: block; 
+} 

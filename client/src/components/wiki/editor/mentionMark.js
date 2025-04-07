@@ -1,4 +1,5 @@
-import { Mark, mergeAttributes } from '@tiptap/core';
+import { Mark, mergeAttributes, getMarkRange } from '@tiptap/core';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
 
 export const MentionMark = Mark.create({
   name: 'mentionMark',
@@ -54,6 +55,83 @@ export const MentionMark = Mark.create({
 
   // Optional: Paste rules (if needed for pasting text with mentions)
   // addPasteRules() { ... }
+
+  // Add plugin to validate mentions on transaction
+  addProseMirrorPlugins() {
+    const markType = this.editor.schema.marks[this.name]; // Get the MarkType instance
+
+    return [
+      new Plugin({
+        key: new PluginKey('mentionMarkValidation'),
+        appendTransaction: (transactions, oldState, newState) => {
+          const docChanged = transactions.some(tr => tr.docChanged);
+          if (!docChanged) {
+            return null;
+          }
+
+          let tr = newState.tr;
+          let modified = false;
+
+          // Use a Set to track validated mark instances (range + label)
+          const validatedMarks = new Set();
+
+          // Iterate through the *entire* new document state
+          newState.doc.nodesBetween(0, newState.doc.content.size, (node, pos) => {
+            if (!node.isText || !node.marks || node.marks.length === 0) {
+              return; // Only interested in text nodes with marks
+            }
+
+            // Find mention marks on this node
+            const mentionMarks = node.marks.filter(mark => mark.type === markType);
+
+            mentionMarks.forEach(mark => {
+              // Find the range of this specific mark instance
+              const $pos = newState.doc.resolve(pos); // Use node's starting position
+              const markRange = getMarkRange($pos, markType, mark.attrs);
+
+              if (markRange) {
+                const { from, to } = markRange;
+                const originalLabel = mark.attrs.label;
+                const uniqueKey = `${from}-${to}-${originalLabel}`;
+
+                // Skip if we've already validated this exact mark instance in this transaction cycle
+                if (validatedMarks.has(uniqueKey)) {
+                  return;
+                }
+
+                // Ensure range is valid before getting text
+                const checkFrom = Math.max(0, from);
+                const checkTo = Math.min(newState.doc.content.size, to);
+                if (checkFrom >= checkTo) { // Check for empty or invalid range
+                   validatedMarks.add(uniqueKey); // Mark as processed even if range was bad
+                   return; 
+                }
+
+                const currentText = newState.doc.textBetween(checkFrom, checkTo, "\ufffc");
+                
+                // Compare current text with the stored label
+                if (currentText !== originalLabel) {
+                  console.log(`Mention text validation failed [${checkFrom},${checkTo}]: '${currentText}' !== '${originalLabel}'. Removing mark.`);
+                  tr = tr.removeMark(checkFrom, checkTo, markType);
+                  modified = true;
+                   // Don't add to validatedMarks, as it's removed now
+                } else {
+                   // Mark as validated if text matches
+                   validatedMarks.add(uniqueKey);
+                }
+              }
+            });
+          });
+
+          if (modified) {
+            return tr;
+          }
+
+          return null;
+        },
+      }),
+    ];
+  },
 });
 
 export default MentionMark; 

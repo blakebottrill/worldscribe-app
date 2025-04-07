@@ -1,0 +1,100 @@
+/* client/src/components/layout/Sidebar.css */
+.sidebar {
+  width: var(--sidebar-width, 240px);
+  flex-shrink: 0; /* Prevent shrinking */
+  background-color: var(--sidebar-bg, #e9ecef);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  box-sizing: border-box;
+  border-right: 1px solid var(--border-color, #dee2e6);
+}
+
+.current-world-section {
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color, #dee2e6);
+}
+
+.current-world-section .section-title {
+  font-size: 0.75rem;
+  color: var(--text-color-secondary, #6c757d);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.current-world-section h3 {
+  margin-top: 0;
+  margin-bottom: 0.25rem;
+  font-size: 1.2rem;
+  color: var(--text-color-primary, #212529);
+}
+
+.current-world-section p {
+  font-size: 0.9rem;
+  color: var(--text-color-secondary, #6c757d);
+  margin-bottom: 0;
+}
+
+.main-nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-nav li {
+  display: block;
+}
+
+.main-nav .nav-link {
+  display: flex;
+  align-items: center;
+  padding: 0.6rem 0.5rem;
+  margin-bottom: 0.25rem;
+  border-radius: 4px;
+  text-decoration: none;
+  color: var(--text-color-primary, #495057);
+  font-weight: 500;
+  transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
+}
+
+.main-nav .nav-link:hover {
+  background-color: #ced4da;
+  color: var(--text-color-primary, #212529);
+}
+
+.main-nav .nav-link.active {
+  background-color: #adb5bd;
+  color: var(--text-color-primary, #000);
+  font-weight: 600;
+}
+
+.main-nav .nav-icon {
+  margin-right: 0.75rem;
+  width: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+}
+
+/* Spacer pushes user section down */
+.sidebar-spacer {
+  flex-grow: 1;
+}
+
+/* Styles for the bottom user section */
+.user-section {
+  padding-top: 1rem;
+  margin-top: 1rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.9rem;
+  color: var(--text-color-secondary);
+  /* Add more styles as needed (logout button, etc.) */
+} 

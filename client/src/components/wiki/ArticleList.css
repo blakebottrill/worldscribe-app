@@ -1,0 +1,61 @@
+/* client/src/components/wiki/ArticleList.css */
+
+.article-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.article-list-item {
+  /* No border needed directly on li */
+}
+
+.article-list-button {
+  display: flex; /* Use flex for layout */
+  flex-direction: column; /* Stack title/meta vertically */
+  align-items: flex-start; /* Align text left */
+  width: 100%;
+  padding: 0.75rem 1rem; /* Adjust padding */
+  border: none;
+  border-bottom: 1px solid var(--border-color);
+  background-color: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  border-radius: 0; /* Remove button radius */
+  transition: background-color 0.15s ease-in-out;
+}
+
+.article-list-item:last-child .article-list-button {
+  border-bottom: none; /* Remove border for last item */
+}
+
+.article-list-item .article-list-button:hover {
+  background-color: var(--button-hover-bg);
+}
+
+.article-list-item.selected .article-list-button {
+  background-color: #dbeafe; /* Light blue background for selected */
+  /* Optionally make text bolder */
+  /* font-weight: 600; */ 
+}
+
+.article-title {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-color-primary);
+  margin-bottom: 0.25rem; /* Space below title */
+}
+
+.article-tags,
+.article-date {
+  font-size: 0.8rem;
+  color: var(--text-color-secondary);
+  display: block; /* Ensure they take own line if needed */
+}
+
+.no-articles-message {
+  padding: 1rem;
+  color: var(--text-color-secondary);
+  text-align: center;
+} 

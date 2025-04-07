@@ -159,6 +159,76 @@ export default {
         },
         renderId: 'ai-expand'
       },
+      // Add new command for Details/Summary
+      {
+        title: 'Details',
+        command: ({ editor, range }) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            // Insert the structure: details > summary + detailsContent > paragraph
+            .insertContent({
+              type: 'detailsNode',
+              content: [
+                {
+                  type: 'summaryNode',
+                  content: [
+                    { type: 'text', text: 'Summary Title' }, // Default summary text
+                  ],
+                },
+                {
+                  type: 'detailsContentNode',
+                  content: [
+                    { type: 'paragraph', content: [{ type: 'text', text: 'Details content...' }] }, // Default content paragraph
+                  ],
+                },
+              ],
+            })
+            // Optional: Move cursor into the summary or content for immediate editing
+            // .setTextSelection(range.from + 'Summary Title'.length) // Example
+            .run();
+        },
+      },
+      // Add Column Commands
+      {
+        title: 'Columns (2)',
+        command: ({ editor, range }) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertContent({
+              type: 'columnLayoutNode',
+              attrs: { columns: 2 },
+              content: [
+                { type: 'columnNode', content: [{ type: 'paragraph' }] },
+                { type: 'columnNode', content: [{ type: 'paragraph' }] },
+              ]
+            })
+            .run();
+        },
+      },
+      {
+        title: 'Columns (3)',
+        command: ({ editor, range }) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertContent({
+              type: 'columnLayoutNode',
+              attrs: { columns: 3 },
+              content: [
+                { type: 'columnNode', content: [{ type: 'paragraph' }] },
+                { type: 'columnNode', content: [{ type: 'paragraph' }] },
+                { type: 'columnNode', content: [{ type: 'paragraph' }] },
+              ]
+            })
+            .run();
+        },
+      },
+      // Can add other variations (e.g., 70/30 split) later
     ];
 
     // Filter commands based on query
