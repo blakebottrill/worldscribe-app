@@ -40,11 +40,23 @@
   /* font-weight: 600; */ 
 }
 
+.article-list-item-content {
+  display: flex;
+  align-items: center;
+}
+
+.article-list-icon {
+  margin-right: 0.5rem; /* Space between icon and title */
+  color: var(--text-color-secondary); /* Icon color */
+  display: inline-flex; /* Align icon vertically */
+  align-items: center;
+}
+
 .article-title {
   font-size: 1rem;
   font-weight: 500;
   color: var(--text-color-primary);
-  margin-bottom: 0.25rem; /* Space below title */
+  margin-bottom: 0; /* Remove margin if icon is next to it */
 }
 
 .article-tags,

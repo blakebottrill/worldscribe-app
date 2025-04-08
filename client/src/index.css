@@ -231,3 +231,13 @@ span[data-mention-id]:hover {
   height: auto; /* Maintain aspect ratio */
   display: block; /* Optional: ensures proper block behavior */
 }
+
+/* Auto-save spinner */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.spin-icon {
+  animation: spin 1s linear infinite;
+}

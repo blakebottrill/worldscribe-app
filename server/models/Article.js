@@ -10,6 +10,11 @@ const ArticleSchema = new mongoose.Schema({
     type: String, // Markdown content
     required: true
   },
+  icon: {
+    type: String,
+    default: 'FaBook', // Default icon name (matches Wiki nav icon)
+    trim: true
+  },
   tags: [{
     type: String,
     trim: true

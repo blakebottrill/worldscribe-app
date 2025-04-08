@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import ArticleList from '../components/wiki/ArticleList';
-import ArticleView from '../components/wiki/ArticleView';
+// import ArticleView from '../components/wiki/ArticleView'; // Remove view for now
 import ArticleEditor from '../components/wiki/ArticleEditor';
 import ArticleLinkModal from '../components/common/ArticleLinkModal';
 // import PinEditModal from '../components/atlas/PinEditModal'; // Remove this leftover import
@@ -11,11 +11,10 @@ import './WikiPage.css';
 const WikiPage = () => {
   const location = useLocation();
   const [articles, setArticles] = useState([]);
-  const [selectedArticle, setSelectedArticle] = useState(null);
+  const [selectedArticleId, setSelectedArticleId] = useState(null); // Track ID for list selection
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingArticleData, setEditingArticleData] = useState(null);
+  const [editingArticleData, setEditingArticleData] = useState(null); // This is now the primary state for the right pane
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState('npc');
   const [userPrompt, setUserPrompt] = useState('');
@@ -79,72 +78,72 @@ const WikiPage = () => {
     return titleMatch || bodyMatch || tagsMatch;
   });
 
-  // Effect to deselect article if it's filtered out
+  // Effect to deselect if filtered out (based on editingArticleData now)
   useEffect(() => {
-    if (selectedArticle && !filteredArticles.some(a => a._id === selectedArticle._id)) {
-      setSelectedArticle(null);
+    if (editingArticleData && !filteredArticles.some(a => a._id === editingArticleData._id)) {
+      setEditingArticleData(null); // Clear editor if article disappears from list
+      setSelectedArticleId(null);
     }
-    // Only re-run if the filtered list changes OR the selected article changes
-  }, [filteredArticles, selectedArticle]);
+  }, [filteredArticles, editingArticleData]);
 
-  // Effect to handle selection via navigation state (runs *after* initial load)
+  // Effect to handle selection via navigation state (sets editingArticleData)
   useEffect(() => {
      if (location.state?.selectedArticleId && articles.length > 0) {
-       const articleToSelect = articles.find(a => a._id === location.state.selectedArticleId);
-       if (articleToSelect) {
-         console.log("Selecting article from navigation state:", articleToSelect.title);
-         setSelectedArticle(articleToSelect);
-         // Clear the state to prevent re-selection
-         // This might not work reliably across all routers/browsers, state management lib is better
-         window.history.replaceState({}, document.title) 
+       const articleToEdit = articles.find(a => a._id === location.state.selectedArticleId);
+       if (articleToEdit) {
+         console.log("Selecting article to edit from navigation state:", articleToEdit.title);
+         setEditingArticleData({ // Set data for editor
+           _id: articleToEdit._id, 
+           title: articleToEdit.title,
+           body: articleToEdit.body,
+           icon: articleToEdit.icon || 'FaBook', // *** Include Icon ***
+           tags: articleToEdit.tags ? articleToEdit.tags.join(', ') : ''
+         });
+         setSelectedArticleId(articleToEdit._id);
+         window.history.replaceState({}, document.title);
        }
      }
-   }, [articles, location.state]); // Rerun if articles load OR location state changes
+   }, [articles, location.state]);
 
+  // Select Article: Now directly sets data for the editor
   const handleSelectArticle = (article) => {
-    setSelectedArticle(article);
-    setIsEditing(false);
-    setEditingArticleData(null);
-  };
-
-  const handleAddNewClick = () => {
-    setSelectedArticle(null);
-    setEditingArticleData({ title: '', body: '', tags: '' });
-    setIsEditing(true);
-  };
-
-  const handleEditClick = () => {
-    if (!selectedArticle) return;
+    console.log("Selected article to edit:", article.title);
     setEditingArticleData({
-      title: selectedArticle.title,
-      body: selectedArticle.body,
-      tags: selectedArticle.tags ? selectedArticle.tags.join(', ') : ''
+        _id: article._id, 
+        title: article.title,
+        body: article.body,
+        icon: article.icon || 'FaBook', // *** Include Icon ***
+        tags: article.tags ? article.tags.join(', ') : ''
     });
-    setIsEditing(true);
+    setSelectedArticleId(article._id);
   };
 
-  const handleDeleteClick = async () => {
-    if (!selectedArticle) return; // Should not happen
+  // Add New: Clears selection, sets blank data for editor
+  const handleAddNewClick = () => {
+    setEditingArticleData({ title: '', body: '', tags: '' });
+    setSelectedArticleId(null); // Ensure no item is highlighted
+  };
 
-    if (window.confirm(`Are you sure you want to delete "${selectedArticle.title}"?`)) {
-      console.log(`Deleting article with ID: ${selectedArticle._id}`);
+  // Delete Click: Needs to clear editor if deleting the edited article
+  const handleDeleteClick = async (articleToDelete) => { // Pass the article to delete
+    if (!articleToDelete) return; 
+
+    if (window.confirm(`Are you sure you want to delete "${articleToDelete.title}"?`)) {
+      console.log(`Deleting article with ID: ${articleToDelete._id}`);
       setError(null);
       try {
-        const response = await fetch(`http://localhost:5001/api/articles/${selectedArticle._id}`, {
-          method: 'DELETE',
-          // TODO: Add Authorization header when auth is implemented
-        });
-
+        const response = await fetch(`http://localhost:5001/api/articles/${articleToDelete._id}`, { method: 'DELETE' });
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ msg: 'Failed to delete article' }));
           throw new Error(errorData.msg || `HTTP error! status: ${response.status}`);
         }
-
-        // If delete is successful, update state immediately
-        setSelectedArticle(null); // Deselect the deleted article
-        setArticles(articles.filter(a => a._id !== selectedArticle._id)); // Remove from list
-        // No need to call fetchArticles() again if we update state locally
-
+        // If delete is successful, update state
+        if (editingArticleData?._id === articleToDelete._id) { // Check if deleting the one being edited
+            setEditingArticleData(null); // Clear editor
+            setSelectedArticleId(null);
+        }
+        // Fetch articles again to update the list (simplest way)
+        await fetchArticles(); 
       } catch (e) {
         console.error("Failed to delete article:", e);
         setError(`Failed to delete article: ${e.message}`);
@@ -152,49 +151,74 @@ const WikiPage = () => {
     }
   };
 
+  // Cancel Edit: Now clears the editor pane
   const handleCancelEdit = () => {
-    setIsEditing(false);
     setEditingArticleData(null);
+    setSelectedArticleId(null);
   };
 
+  // Save Article: Update state locally on update, refetch only on create
   const handleSaveArticle = async (articleData) => {
-    const isUpdating = selectedArticle && editingArticleData;
+    const isUpdating = editingArticleData && editingArticleData._id;
+    const articleId = isUpdating ? editingArticleData._id : null;
     const url = isUpdating 
-      ? `http://localhost:5001/api/articles/${selectedArticle._id}` 
+      ? `http://localhost:5001/api/articles/${articleId}` 
       : 'http://localhost:5001/api/articles';
     const method = isUpdating ? 'PUT' : 'POST';
 
-    // *** Log the body HTML before sending ***
-    console.log(`Saving article (Method: ${method}) - Body HTML being sent:`, articleData.body);
+    console.log(`Saving article (Method: ${method}) - Body:`, articleData.body.substring(0,50)); // Log less
     setError(null);
+    // We don't set isSaving state here anymore, editor handles its own status
+    
     try {
       const response = await fetch(url, {
         method: method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(articleData),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ // Only send fields being saved
+          title: articleData.title,
+          body: articleData.body,
+          tags: articleData.tags, // Assuming tags are sent as comma-separated string
+          icon: articleData.icon, // *** Add the icon field ***
+        }),
       });
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ msg: `Failed to ${isUpdating ? 'update' : 'save'} article` }));
         throw new Error(errorData.msg || `HTTP error! status: ${response.status}`);
       }
-
       const savedArticle = await response.json();
 
-      setIsEditing(false);
-      setEditingArticleData(null);
-      await fetchArticles();
+      if (isUpdating) {
+        // Update state locally for the edited article
+        setArticles(prevArticles => 
+          prevArticles.map(a => 
+            a._id === savedArticle._id ? savedArticle : a
+          )
+        );
+        // Update the editor data to reflect saved state (including potentially new updatedAt)
+        setEditingArticleData(prev => ({...prev, ...savedArticle, tags: savedArticle.tags?.join(', ') || ''}));
+        setSelectedArticleId(savedArticle._id);
+        console.log("Local state updated after save.");
+      } else {
+        // Refetch the whole list only when creating a new article
+        await fetchArticles(); 
+        // Set the new article as the one being edited
+        setEditingArticleData({ ...savedArticle, tags: savedArticle.tags?.join(', ') || ''});
+        setSelectedArticleId(savedArticle._id);
+        console.log("Refetched articles after creating new.");
+      }
       
-      setSelectedArticle(isUpdating ? savedArticle : (articles.find(a => a._id === savedArticle._id) || savedArticle));
+      // The ArticleEditor component handles its own save status UI
+      // So no need to return anything specific here unless error handling needs it.
 
     } catch (e) {
       console.error(`Failed to ${isUpdating ? 'update' : 'save'} article:`, e);
       setError(`Failed to ${isUpdating ? 'update' : 'save'} article: ${e.message}`);
+      // Rethrow the error so the editor component knows save failed
+      throw e; 
     }
   };
 
+  // Generate From Template: Should also select the new article for editing
   const handleGenerateFromTemplate = async () => {
     setIsGenerating(true);
     setError(null);
@@ -210,10 +234,10 @@ const WikiPage = () => {
       }
       const newArticle = await response.json();
       console.log("Generated article:", newArticle);
-      setUserPrompt(''); // Clear prompt input
-      await fetchArticles(); // Refresh the list
-      setSelectedArticle(newArticle); // Select the newly generated article
-      setIsEditing(false); // Ensure we are in view mode
+      setUserPrompt('');
+      await fetchArticles(); 
+      // Select the newly generated article for editing
+      handleSelectArticle(newArticle); 
 
     } catch (e) {
       console.error("Failed to generate article:", e);
@@ -320,7 +344,7 @@ const WikiPage = () => {
            {!isLoading && !error && (
              <ArticleList 
                articles={filteredArticles} 
-               selectedArticleId={selectedArticle?._id} 
+               selectedArticleId={selectedArticleId} // Pass ID for highlighting
                onSelectArticle={handleSelectArticle} 
              />
            )}
@@ -334,22 +358,16 @@ const WikiPage = () => {
 
       {/* Right Pane: View/Edit Article or Welcome Message */}
       <div className="wiki-right-pane">
-        {isEditing ? (
+        {editingArticleData ? (
           <ArticleEditor 
-            key={editingArticleData?._id || 'new'} // Add key for re-mounting on edit
+            key={editingArticleData._id || 'new'} // Key ensures re-mount when switching articles
             initialData={editingArticleData}
-            articles={articles} // Pass for mentions
+            articles={articles} 
             onSave={handleSaveArticle} 
-            onCancel={handleCancelEdit}
+            onCancel={handleCancelEdit} 
             onShowMentionLinkModal={handleShowEditorLinkModal}
-          />
-        ) : selectedArticle ? (
-          <ArticleView 
-            article={selectedArticle} 
-            articles={articles} // Pass for link resolution
-            onSelectArticle={handleSelectArticle} // Allow clicking mentions
-            onEdit={handleEditClick} 
-            onDelete={handleDeleteClick}
+            // Add onDelete prop to editor?
+            onDelete={() => handleDeleteClick(editingArticleData)} // Pass delete handler for the current article
           />
         ) : (
           <div className="welcome-message">

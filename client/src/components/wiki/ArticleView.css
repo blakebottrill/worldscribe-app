@@ -1,0 +1,70 @@
+/* client/src/components/wiki/ArticleView.css */
+
+.article-view-container {
+  /* Styles for the main view container if needed */
+}
+
+.article-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.article-header h2 {
+  margin: 0;
+}
+
+.article-actions .delete-button {
+  background-color: #f8d7da; /* Light red */
+  border-color: #f5c2c7;
+  color: #842029; /* Dark red */
+}
+.article-actions .delete-button:hover {
+  background-color: #f1aeb5;
+  border-color: #f1aeb5;
+}
+
+.article-body {
+  margin-bottom: 2rem; /* Space below body content */
+}
+
+.article-tags-container {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem; /* Space between tags */
+}
+
+.tag-pill {
+  display: inline-flex; /* Use inline-flex for icon alignment */
+  align-items: center;
+  background-color: #e9ecef; /* Light gray background */
+  color: var(--text-color-secondary);
+  padding: 0.25rem 0.75rem;
+  border-radius: 50rem; /* Make it pill-shaped */
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1.5;
+  cursor: default; /* Not clickable for now */
+}
+
+.tag-icon {
+  margin-right: 0.35rem;
+  /* Vertically align icon slightly better if needed */
+  vertical-align: middle; 
+  position: relative;
+  top: -1px; 
+}
+
+.article-metadata {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.8rem;
+  color: var(--text-color-secondary);
+  display: flex;
+  justify-content: space-between;
+} 

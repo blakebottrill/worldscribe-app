@@ -1,4 +1,6 @@
 import React, { useEffect, useRef } from 'react';
+import { FaTag } from 'react-icons/fa'; // Import tag icon
+import './ArticleView.css'; // Add CSS file for view-specific styles
 // Remove ReactMarkdown and pre-processing logic
 // import ReactMarkdown from 'react-markdown';
 // const mentionRegex = /@([a-zA-Z0-9\s-]+)/g;
@@ -60,26 +62,40 @@ const ArticleView = ({ article, articles, onSelectArticle, onEdit, onDelete }) =
   // const processedBody = preprocessMarkdown(article.body);
 
   return (
-    <div style={viewStyles}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1em' }}>
+    <div className="article-view-container" style={viewStyles}>
+      <div className="article-header">
         <h2>{article.title}</h2>
-        <div>
+        <div className="article-actions">
           <button onClick={onEdit} style={{ marginRight: '10px' }}>Edit</button>
-          <button onClick={onDelete} style={{ backgroundColor: '#dc3545', color: 'white' }}>Delete</button>
+          <button onClick={onDelete} className="delete-button">Delete</button>
         </div>
       </div>
-      {/* Render HTML and add ref */}
+      
+      {/* Render body content */} 
       <div 
-        ref={contentRef} // Add ref here
-        className="tiptap-rendered-content" 
+        ref={contentRef} 
+        className="tiptap-rendered-content article-body" 
         dangerouslySetInnerHTML={{ __html: article.body || '' }} 
       />
       
+      {/* Render tags in the new style */}
       {article.tags && article.tags.length > 0 && (
-        <div style={{ marginTop: '20px', fontStyle: 'italic' }}>
-          Tags: {article.tags.join(', ')}
+        <div className="article-tags-container">
+          {article.tags.map((tag, index) => (
+            <span key={index} className="tag-pill">
+              <FaTag className="tag-icon" /> {tag}
+            </span>
+          ))}
         </div>
       )}
+
+      {/* Metadata (Optional, example) */}
+      {/* 
+      <div className="article-metadata"> 
+         <span>Created: {new Date(article.createdAt).toLocaleString()}</span> 
+         <span>Updated: {new Date(article.updatedAt).toLocaleString()}</span> 
+      </div> 
+      */}
     </div>
   );
 };

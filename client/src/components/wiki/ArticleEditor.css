@@ -1,0 +1,117 @@
+.title-icon-area {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.5rem; /* Space below title area */
+  margin-top: 1rem; /* Space above title area */
+}
+
+.icon-select-button {
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  margin-right: 0.75rem;
+  cursor: pointer;
+  color: var(--text-color-secondary);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-select-button:hover {
+  color: var(--text-color-primary);
+  background-color: var(--button-hover-bg);
+}
+
+.title-input {
+  flex-grow: 1; 
+  font-size: 1.8em;
+  font-weight: bold;
+  border: none;
+  outline: none;
+  padding: 0.25em 0;
+  background-color: transparent; /* Inherit background */
+  color: var(--text-color-primary); /* Inherit text color */
+}
+
+.tags-input-area {
+  margin-top: 20px; 
+  margin-bottom: 10px;
+}
+
+.tags-input-area label {
+  margin-right: 10px;
+  font-size: 0.9em;
+  color: var(--text-color-secondary);
+}
+
+.tags-input-area input {
+  width: calc(100% - 60px); 
+  font-size: 0.9em;
+}
+
+.action-buttons-area {
+  margin-top: 20px; 
+  display: flex; 
+  justify-content: flex-end;
+}
+
+.action-buttons-area .delete-button {
+  background-color: #f8d7da; /* Light red */
+  border-color: #f5c2c7;
+  color: #842029; /* Dark red */
+}
+.action-buttons-area .delete-button:hover {
+  background-color: #f1aeb5;
+  border-color: #f1aeb5;
+}
+
+/* --- Tag Input --- */
+.tags-section {
+  margin-top: 1rem; /* Adjusted margin */
+  margin-bottom: 1rem;
+}
+
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem; /* Spacing between tags */
+  padding-top: 0.5rem; /* Space above tags */
+}
+
+.tag-item {
+  display: inline-flex; /* Use flex to align icon, text, and button */
+  align-items: center;
+  background-color: #e9ecef; /* Light grey background like the image */
+  color: #495057; /* Darker text color */
+  padding: 0.3rem 0.6rem; /* Padding around content */
+  border-radius: 1rem; /* Rounded corners */
+  font-size: 0.85em;
+  cursor: default; /* Indicate it's not directly clickable */
+}
+
+.tag-item svg {
+  /* Style for the FaTag icon */
+  margin-right: 0.3rem;
+  color: #6c757d; /* Slightly muted icon color */
+}
+
+.tag-item span {
+  /* Style for the tag text */
+  margin-right: 0.4rem;
+}
+
+.remove-tag-button {
+  background: none;
+  border: none;
+  color: #6c757d; /* Muted color for the 'x' */
+  cursor: pointer;
+  font-size: 1.1em; /* Make 'x' slightly larger */
+  line-height: 1; /* Ensure proper vertical alignment */
+  padding: 0 0.2rem; /* Small padding for click area */
+  margin-left: auto; /* Pushes button to the right if needed, though flex gap helps */
+}
+
+.remove-tag-button:hover {
+  color: #dc3545; /* Red color on hover */
+} 
