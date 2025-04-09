@@ -23,6 +23,9 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
   const initialDataLoadedRef = useRef(false);
   // Track if we're in the middle of a save operation
   const isSavingRef = useRef(false);
+  const debounceTimerRef = useRef(null);
+  // Ref to store the data intended for the next debounced save
+  const pendingSaveDataRef = useRef(null);
 
   // Handle initialData changes (e.g., when navigating between articles)
   useEffect(() => {
@@ -54,19 +57,32 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
   const handleTitleChange = (e) => {
     const newTitle = e.target.value;
     setTitle(newTitle);
-    debouncedSave({ title: newTitle });
+    // Pass the complete intended state to debouncedSave
+    debouncedSave({ 
+      title: newTitle, 
+      body: body, 
+      tags: tagList.join(','), 
+      icon: icon 
+    });
   };
 
   // Body change handler with debounced save
   const handleBodyChange = useCallback((newBody) => {
     setBody(newBody);
-    debouncedSave({ body: newBody });
-  }, []);
+    // Pass the complete intended state to debouncedSave
+    debouncedSave({ 
+      title: title, 
+      body: newBody, 
+      tags: tagList.join(','), 
+      icon: icon 
+    });
+  }, [title, tagList, icon]);
 
   // Icon change handler with immediate save
   const handleIconSelect = (selectedIconName) => {
     setIcon(selectedIconName);
-    saveArticle({ icon: selectedIconName });
+    // Immediate save - Pass only the changed field
+    saveArticle({ icon: selectedIconName }); 
   };
 
   // Handle tag input key events (Enter to add tag)
@@ -74,18 +90,12 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
     if (e.key === 'Enter') {
       e.preventDefault();
       const newTagsRaw = tagInput.trim();
-      
       if (newTagsRaw) {
-        const newTags = newTagsRaw
-          .split(',')
-          .map(tag => tag.trim())
-          .filter(tag => tag !== '' && !tagList.includes(tag));
-          
+        const newTags = newTagsRaw.split(',').map(tag => tag.trim()).filter(tag => tag !== '' && !tagList.includes(tag));
         if (newTags.length > 0) {
           const updatedTagList = [...tagList, ...newTags];
           setTagList(updatedTagList);
-          
-          // Immediately save when tags are added
+          // Immediate save - Pass only the changed field
           saveArticle({ tags: updatedTagList.join(',') });
         }
       }
@@ -97,9 +107,7 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
   const handleRemoveTag = (indexToRemove) => {
     const updatedTagList = tagList.filter((_, index) => index !== indexToRemove);
     setTagList(updatedTagList);
-    
-    // Immediately save when a tag is removed
-    // Send empty string if no tags remain to ensure consistency
+    // Immediate save - Pass only the changed field
     saveArticle({ tags: updatedTagList.length ? updatedTagList.join(',') : '' });
   };
 
@@ -110,12 +118,12 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
     }
   };
 
-  // Debounce timer ref
-  const debounceTimerRef = useRef(null);
-
   // Debounced save function (for content that changes frequently like title and body)
-  const debouncedSave = (changedFields) => {
+  const debouncedSave = (intendedData) => {
     if (!initialDataLoadedRef.current) return;
+    
+    // Store the latest intended data
+    pendingSaveDataRef.current = intendedData;
     
     // Clear any existing timer
     if (debounceTimerRef.current) {
@@ -124,35 +132,46 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
     
     // Set a new timer
     debounceTimerRef.current = setTimeout(() => {
-      saveArticle(changedFields);
+      // When timer expires, save the data that was last pending
+      if (pendingSaveDataRef.current) {
+        // Pass the *full* pending data to saveArticle
+        saveArticle(pendingSaveDataRef.current, true); // Pass flag indicating it's a debounced save
+        pendingSaveDataRef.current = null; // Clear pending data after scheduling save
+      }
     }, 1000);
   };
 
-  // Function to save article with changed fields
-  const saveArticle = (changedFields) => {
+  // Function to save article
+  // Takes either partial data (for immediate saves) or full data (for debounced saves)
+  const saveArticle = (dataToSave, isDebounced = false) => {
     if (!initialDataLoadedRef.current || isSavingRef.current) return;
     
     isSavingRef.current = true;
     
-    // Make sure tags is always a string (even if empty)
-    let tagsToSave = '';
-    if (changedFields.tags !== undefined) {
-      tagsToSave = changedFields.tags; // Use provided value
-    } else if (tagList.length) {
-      tagsToSave = tagList.join(','); // Convert current tagList to string
-    }
-    
-    const articleData = {
+    // Construct the final data object
+    const finalArticleData = {
       _id: initialData?._id,
-      title: changedFields.title !== undefined ? changedFields.title : title,
-      body: changedFields.body !== undefined ? changedFields.body : body,
-      tags: tagsToSave, // Use our processed tags value
-      icon: changedFields.icon !== undefined ? changedFields.icon : icon
+      // Start with current state as baseline only if it's an immediate save
+      title: isDebounced ? dataToSave.title : title,
+      body: isDebounced ? dataToSave.body : body,
+      tags: isDebounced ? dataToSave.tags : (tagList.length ? tagList.join(',') : ''),
+      icon: isDebounced ? dataToSave.icon : icon,
     };
+
+    // If it's an immediate save, merge the specific changed field(s)
+    if (!isDebounced) {
+      if (dataToSave.title !== undefined) finalArticleData.title = dataToSave.title;
+      if (dataToSave.body !== undefined) finalArticleData.body = dataToSave.body;
+      if (dataToSave.tags !== undefined) finalArticleData.tags = dataToSave.tags;
+      if (dataToSave.icon !== undefined) finalArticleData.icon = dataToSave.icon;
+    }
+
+    // Ensure tags is always a string before saving
+    finalArticleData.tags = finalArticleData.tags || '';
+
+    console.log("Saving article with data (isDebounced:", isDebounced, "):", finalArticleData);
     
-    console.log("Saving article with data:", articleData);
-    
-    onSave(articleData)
+    onSave(finalArticleData)
       .then(() => {
         console.log("Article saved successfully");
         isSavingRef.current = false;
