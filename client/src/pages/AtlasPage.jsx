@@ -4,6 +4,7 @@ import MapList from '../components/atlas/MapList';
 import MapUploadForm from '../components/atlas/MapUploadForm';
 import MapView from '../components/atlas/MapView';
 import ArticleLinkModal from '../components/common/ArticleLinkModal';
+import PinEditModal from '../components/atlas/PinEditModal';
 
 const AtlasPage = () => {
   const [maps, setMaps] = useState([]);
@@ -14,10 +15,18 @@ const AtlasPage = () => {
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [mapRefreshKey, setMapRefreshKey] = useState(0);
   const [pinsLocked, setPinsLocked] = useState(true);
+  
+  // Article Link Modal state
   const [showArticleLinkModal, setShowArticleLinkModal] = useState(false);
   const [linkModalCurrentId, setLinkModalCurrentId] = useState(null);
   const [linkTargetPinId, setLinkTargetPinId] = useState(null);
   const [linkTargetPinCoords, setLinkTargetPinCoords] = useState(null);
+  
+  // Pin Edit Modal state
+  const [showPinEditModal, setShowPinEditModal] = useState(false);
+  const [editingPin, setEditingPin] = useState(null);
+  const [editingPinArticle, setEditingPinArticle] = useState(null);
+  
   const navigate = useNavigate();
 
   const fetchData = useCallback(async () => {
@@ -174,30 +183,68 @@ const AtlasPage = () => {
   };
 
   const handleModalSelectArticle = async (selectedArticle) => {
-      const articleId = selectedArticle?._id || null;
-      console.log(`Article selected (or unlinked): ${articleId}, Target Pin ID: ${linkTargetPinId}, Target Coords:`, linkTargetPinCoords);
-      
-      setError(null);
+      // Check if the necessary context (target pin/coords) exists
+      if (!linkTargetPinId && !linkTargetPinCoords) {
+          console.error("Cannot link article: Target pin context is missing.");
+          setError("Cannot link article: Target pin context is missing.");
+          // Close modal and reset state
+          setShowArticleLinkModal(false);
+          setLinkTargetPinId(null);
+          setLinkTargetPinCoords(null);
+          setLinkModalCurrentId(null);
+          return;
+      }
+
+      // Check if articles list is available
+      if (!Array.isArray(articles)) {
+          console.error("Articles list is not available. Cannot proceed with linking.");
+          setError("Error: Articles data is missing. Cannot link pin.");
+          setShowArticleLinkModal(false);
+          setLinkTargetPinId(null);
+          setLinkTargetPinCoords(null);
+          setLinkModalCurrentId(null);
+          return;
+      }
+
       setShowArticleLinkModal(false);
+      setError(null);
+      
+      // Existing check for the selected article within the list remains valid
+      console.log("Checking articles list:", articles);
+      const article = articles.find(a => a._id === selectedArticle._id);
+      
+      if (!article) {
+        console.error("Selected article not found in the list!");
+        setError('Selected article could not be found. Cannot create/update link.');
+        // Reset link modal state even on error (modal is already closed)
+        setLinkTargetPinId(null);
+        setLinkTargetPinCoords(null);
+        setLinkModalCurrentId(null);
+        return;
+      }
+
+      let url, method, body;
+      if (linkTargetPinId) {
+          // Updating existing pin's article link
+          url = `http://localhost:5001/api/maps/${selectedMap._id}/pins/${linkTargetPinId}`;
+          method = 'PUT';
+          body = JSON.stringify({ articleId: selectedArticle._id });
+      } else if (linkTargetPinCoords) {
+          // Creating a new pin with article link
+          url = `http://localhost:5001/api/maps/${selectedMap._id}/pins`;
+          method = 'PUT';
+          body = JSON.stringify({ ...linkTargetPinCoords, articleId: selectedArticle._id });
+      } else {
+          throw new Error("Modal selection handler called without target context.");
+      }
 
       try {
-          let response;
-          if (linkTargetPinId) {
-              response = await fetch(`http://localhost:5001/api/maps/${selectedMap._id}/pins/${linkTargetPinId}`, {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ articleId }),
-              });
-          } else if (linkTargetPinCoords) {
-              response = await fetch(`http://localhost:5001/api/maps/${selectedMap._id}/pins`, {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ ...linkTargetPinCoords, articleId }),
-              });
-          } else {
-              throw new Error("Modal selection handler called without target context.");
-          }
-
+          const response = await fetch(url, {
+              method: method,
+              headers: { 'Content-Type': 'application/json' },
+              body: body,
+          });
+          
           if (!response.ok) {
               const errorData = await response.json().catch(() => ({ msg: 'Failed to update pin link' }));
               throw new Error(errorData.msg || `HTTP error! status: ${response.status}`);
@@ -211,9 +258,90 @@ const AtlasPage = () => {
           setError(`Failed to save pin link: ${e.message}`);
       }
       
+      // Reset link modal state
       setLinkTargetPinId(null);
       setLinkTargetPinCoords(null);
       setLinkModalCurrentId(null);
+  };
+  
+  const handleShowPinEditModal = (context) => {
+      console.log("Showing pin edit modal with context:", context);
+      if (context.pin && context.pin.article) {
+          const article = articles.find(a => a._id === context.pin.article._id);
+          setEditingPin(context.pin);
+          setEditingPinArticle(article);
+          setShowPinEditModal(true);
+      } else {
+          console.error("Cannot edit pin without an article link");
+          // If no article, show the link modal first
+          handleShowPinLinkModal(context);
+      }
+  };
+  
+  const handlePinEditSave = async (updatedPin) => {
+      if (!selectedMap || !updatedPin || !updatedPin._id) {
+          console.error("Missing data needed to update pin.");
+          setError("Error updating pin: Missing required data.");
+          return;
+      }
+      
+      setError(null);
+      setShowPinEditModal(false);
+      
+      // Generate or use existing iconId
+      const iconId = updatedPin.iconId || `icon_${Date.now()}`;
+      
+      try {
+          // First, update the pin with new attributes
+          const response = await fetch(`http://localhost:5001/api/maps/${selectedMap._id}/pins/${updatedPin._id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  icon: updatedPin.icon,
+                  iconId: iconId,
+                  shape: updatedPin.shape,
+                  color: updatedPin.color,
+                  displayType: updatedPin.displayType
+              }),
+          });
+          
+          if (!response.ok) {
+              const errorData = await response.json().catch(() => ({ msg: 'Failed to update pin' }));
+              throw new Error(errorData.msg || `HTTP error! status: ${response.status}`);
+          }
+          
+          console.log("Pin updated successfully with iconId:", iconId);
+          
+          // Always update the linked article's icon if this pin is linked to an article
+          if (updatedPin.article && updatedPin.article._id) {
+              const articleId = updatedPin.article._id;
+              
+              console.log(`Updating article ${articleId} icon to: ${updatedPin.icon} with iconId: ${iconId}`);
+              
+              const articleResponse = await fetch(`http://localhost:5001/api/articles/${articleId}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    icon: updatedPin.icon,
+                    iconId: iconId 
+                  }),
+              });
+              
+              if (!articleResponse.ok) {
+                  console.error(`Failed to update article icon: ${articleResponse.statusText}`);
+              } else {
+                  console.log(`Successfully updated article with icon ${updatedPin.icon} and iconId ${iconId}`);
+                  // Refresh our articles list to show the updated icon
+                  fetchData();
+              }
+          }
+          
+          setMapRefreshKey(prev => prev + 1);
+          
+      } catch (e) {
+          console.error("Failed to update pin:", e);
+          setError(`Failed to update pin: ${e.message}`);
+      }
   };
 
   return (
@@ -255,6 +383,7 @@ const AtlasPage = () => {
                   onPinClick={handlePinClick} 
                   onDeletePin={handleDeletePin}
                   onShowLinkModal={handleShowPinLinkModal}
+                  onShowEditModal={handleShowPinEditModal}
                   pinsLocked={pinsLocked}
                   onUpdatePinPosition={handleUpdatePinPosition}
                 />
@@ -268,6 +397,7 @@ const AtlasPage = () => {
         </div>
       )}
 
+      {/* Article Link Modal */}
       {showArticleLinkModal && (
         <ArticleLinkModal
           articles={articles} 
@@ -279,6 +409,22 @@ const AtlasPage = () => {
               setLinkTargetPinCoords(null);
               setLinkModalCurrentId(null);
           }} 
+        />
+      )}
+      
+      {/* Pin Edit Modal */}
+      {showPinEditModal && editingPin && (
+        <PinEditModal
+          pin={editingPin}
+          linkedArticle={editingPinArticle}
+          articles={articles}
+          onSave={handlePinEditSave}
+          onArticleLinkClick={(pin) => handleShowPinLinkModal({ pin })}
+          onClose={() => {
+              setShowPinEditModal(false);
+              setEditingPin(null);
+              setEditingPinArticle(null);
+          }}
         />
       )}
     </div>

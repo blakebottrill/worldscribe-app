@@ -22,7 +22,7 @@ exports.getMapById = async (req, res) => {
   try {
     const map = await Map.findById(req.params.id).populate({
       path: 'pins.article',
-      select: 'title' // Only select the title from the linked Article
+      select: 'title icon iconId' // Include title, icon, and iconId from linked Article
     });
 
     if (!map) {
@@ -85,8 +85,8 @@ exports.createMap = async (req, res) => {
 
 // Update map pins
 exports.updateMapPins = async (req, res) => {
-  // Expect articleId instead of articleTitle
-  const { x, y, articleId } = req.body;
+  // Expect articleId instead of articleTitle, plus optional customization properties
+  const { x, y, articleId, icon, iconId, shape, color, displayType } = req.body;
   const mapId = req.params.id;
 
   // Basic validation
@@ -95,9 +95,6 @@ exports.updateMapPins = async (req, res) => {
   }
 
   try {
-    // Remove Article lookup by title
-    /* const article = await Article.findOne({ ... }); */
-
     // 2. Find the Map
     const map = await Map.findById(mapId);
     if (!map) {
@@ -106,11 +103,16 @@ exports.updateMapPins = async (req, res) => {
 
     // TODO: Check user ownership of the map
 
-    // 3. Create the new pin object
+    // 3. Create the new pin object with customization options
     const newPin = {
       x: x,
       y: y,
-      article: articleId || null // Use passed ID or null
+      article: articleId || null, // Use passed ID or null
+      icon: icon || null,      // Legacy field
+      iconId: iconId || null,  // New shared icon identifier
+      shape: shape || 'pin', // Default to pin shape
+      color: color || '#dc3545', // Default red color
+      displayType: displayType || 'pin+icon' // Default to showing both
     };
 
     // 4. Add the pin to the map's pins array
@@ -122,7 +124,7 @@ exports.updateMapPins = async (req, res) => {
     // 6. Fetch the updated map with populated pins for the response
     const updatedMap = await Map.findById(mapId).populate({
       path: 'pins.article',
-      select: 'title'
+      select: 'title icon iconId' // Include iconId in populated data
     });
 
     res.json(updatedMap); // Return the whole updated map
@@ -213,11 +215,13 @@ exports.deleteMapPin = async (req, res) => {
 // Update a specific pin
 exports.updateMapPin = async (req, res) => {
   const { mapId, pinId } = req.params;
-  // Expect articleId instead of articleTitle (and optionally x, y)
-  const { articleId, x, y } = req.body;
+  // Expanded to include all pin customization properties and iconId
+  const { articleId, x, y, icon, iconId, shape, color, displayType } = req.body;
 
   // Basic check: at least one updatable field must be present
-  if (articleId === undefined && x === undefined && y === undefined) {
+  if (articleId === undefined && x === undefined && y === undefined && 
+      icon === undefined && iconId === undefined && shape === undefined && 
+      color === undefined && displayType === undefined) {
       return res.status(400).json({ msg: 'No update data provided for pin.' });
   }
 
@@ -242,32 +246,39 @@ exports.updateMapPin = async (req, res) => {
     }
 
     // Update Coordinates (if x and y are provided)
-    if (x !== undefined && y !== undefined) {
-        // Add validation if needed (e.g., ensure they are numbers between 0 and 1)
-        if (typeof x === 'number' && typeof y === 'number') {
-            pin.x = Math.max(0, Math.min(1, x));
-            pin.y = Math.max(0, Math.min(1, y));
-        } else {
-            return res.status(400).json({ msg: 'Invalid coordinate format provided.' });
-        }
+    if (x !== undefined) pin.x = x;
+    if (y !== undefined) pin.y = y;
+    
+    // Handle icon updates - legacy field
+    if (icon !== undefined) {
+      pin.icon = icon;
+    }
+    
+    // Handle iconId updates - new central identifier
+    if (iconId !== undefined) {
+      pin.iconId = iconId;
     }
 
-    // Save the parent map document
+    // Update other customization fields
+    if (shape !== undefined) pin.shape = shape;
+    if (color !== undefined) pin.color = color;
+    if (displayType !== undefined) pin.displayType = displayType;
+
+    // Save the updated map
     await map.save();
 
-    // Find the map again to populate the updated pin for the response
-    const updatedMap = await Map.findById(mapId).populate({
+    // Populate the pin's article data before sending response
+    await Map.populate(map, {
       path: 'pins.article',
-      select: 'title'
+      select: 'title icon iconId'
     });
-    const updatedPin = updatedMap.pins.id(pinId);
 
-    res.json(updatedPin); // Return the updated pin data
+    res.json(pin); // Return just the updated pin with populated article
 
   } catch (err) {
     console.error(`Error updating pin ${pinId} on map ${mapId}:`, err);
     if (err.kind === 'ObjectId') {
-      return res.status(404).json({ msg: 'Map, Pin, or Article not found' });
+      return res.status(404).json({ msg: 'Map or Pin not found' });
     }
     res.status(500).send('Server Error');
   }

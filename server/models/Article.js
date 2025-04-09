@@ -12,8 +12,12 @@ const ArticleSchema = new mongoose.Schema({
   },
   icon: {
     type: String,
-    default: 'FaBook', // Default icon name (matches Wiki nav icon)
-    trim: true
+    default: 'FaHome'  // Default icon
+  },
+  // Add iconId field that matches the one in the Pin schema
+  iconId: {
+    type: String,
+    default: null,  // Shared icon identifier
   },
   tags: [{
     type: String,

@@ -84,11 +84,83 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
     });
   }, [title, tagList, icon]);
 
-  // Icon change handler with immediate save
-  const handleIconSelect = (selectedIconName) => {
-    setIcon(selectedIconName);
-    // Immediate save - Pass only the changed field
-    saveArticle({ icon: selectedIconName }); 
+  // Icon change handler with immediate save and pin syncing
+  const handleIconSelect = async (iconName) => {
+    setIcon(iconName);
+    setShowIconPicker(false);
+    
+    // Generate a unique iconId if this is a new selection
+    const iconId = initialData?.iconId || `icon_${Date.now()}`;
+    
+    // Update the article with the new icon and iconId
+    const updatedArticle = {
+      ...initialData,
+      icon: iconName,
+      iconId: iconId // Store the iconId for sharing between pins and articles
+    };
+    
+    try {
+      // Save the article first
+      if (onSave) {
+        await onSave(updatedArticle);
+        console.log("Article saved with new icon:", iconName, "and iconId:", iconId);
+      }
+      
+      // Sync iconId to ALL related pins
+      if (initialData && initialData._id) {
+        const articleId = initialData._id;
+        
+        const mapsResponse = await fetch('http://localhost:5001/api/maps');
+        if (!mapsResponse.ok) throw new Error('Failed to fetch maps for icon sync');
+        const mapsData = await mapsResponse.json();
+        
+        let syncedPins = 0;
+        // Ensure mapsData is an array before iterating
+        if (Array.isArray(mapsData)) { 
+          for (const map of mapsData) {
+            // Ensure map.pins is an array before filtering
+            console.log(`Checking map ${map?._id}. Pins data:`, map?.pins);
+            if (map && Array.isArray(map.pins)) {
+              // Find all pins linked to this article
+              const relatedPins = map.pins.filter(pin => 
+                pin.article && 
+                pin.article._id === articleId
+              );
+              
+              // If any pins need updating, update them
+              if (relatedPins.length > 0) {
+                for (const pin of relatedPins) {
+                  // Send the shared iconId and icon to all related pins
+                  const response = await fetch(`http://localhost:5001/api/maps/${map._id}/pins/${pin._id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                      iconId: iconId,
+                      icon: iconName
+                    }),
+                  });
+                  
+                  if (!response.ok) {
+                    console.error(`Failed to sync icon to pin ${pin._id} on map ${map._id}`);
+                  } else {
+                    syncedPins++;
+                    console.log(`Successfully synced icon ${iconName} with iconId ${iconId} to pin ${pin._id}`);
+                  }
+                }
+              }
+            } else {
+              console.warn(`Map ${map?._id || 'unknown'} is missing or has an invalid pins array, skipping for icon sync.`);
+            }
+          }
+        } else {
+           console.warn("Received non-array data from /api/maps, skipping icon sync.");
+        }
+        
+        console.log(`Icon sync complete: updated ${syncedPins} pins with icon ${iconName} and iconId ${iconId}`);
+      }
+    } catch (error) {
+      console.error("Error updating article icon or syncing to pins:", error);
+    }
   };
 
   // Handle tag input key events (Enter to add tag)

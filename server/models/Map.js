@@ -14,6 +14,25 @@ const PinSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'Article', // Link to the Article model
     // required: true, // REMOVED - Link is now optional
+  },
+  // Pin customization fields
+  iconId: {
+    type: String,
+    default: null, // Shared icon identifier
+  },
+  shape: {
+    type: String,
+    enum: ['pin', 'circle', 'square', 'arch', 'shield', 'flag', 'ribbon', 'chevron'],
+    default: 'pin'
+  },
+  color: {
+    type: String,
+    default: '#dc3545' // Default red color
+  },
+  displayType: {
+    type: String,
+    enum: ['pin+icon', 'icon-only', 'hide-icon', 'pin'],
+    default: 'pin+icon'
   }
 }); // REMOVED , { _id: false } - Pins will now have their own _id
 

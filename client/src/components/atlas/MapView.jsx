@@ -1,16 +1,37 @@
-import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import tippy from 'tippy.js'; // Import tippy
 import { Menu, Item, useContextMenu } from 'react-contexify'; // Import context menu components
 import 'react-contexify/ReactContexify.css'; // Import context menu CSS
 import { Rnd } from 'react-rnd'; // Import Rnd
+import * as FaIcons from 'react-icons/fa'; // Import Font Awesome icons
 // tippy.css is already imported in main.jsx
 
 const PIN_MENU_ID = "pin-context-menu";
 const MAP_MENU_ID = "map-context-menu"; // New ID for map menu
 
-// Accept pinsLocked and onUpdatePinPosition props
-const MapView = ({ mapId, onPinClick, onDeletePin, pinsLocked, onUpdatePinPosition, onShowLinkModal }) => {
+// Define SVG paths for custom pin shapes
+const PIN_SHAPES = {
+  'pin': 'M10,0 C4.5,0 0,4.5 0,10 C0,15.5 10,30 10,30 C10,30 20,15.5 20,10 C20,4.5 15.5,0 10,0 Z',
+  'circle': 'M10,0 C4.5,0 0,4.5 0,10 C0,15.5 4.5,20 10,20 C15.5,20 20,15.5 20,10 C20,4.5 15.5,0 10,0 Z',
+  'square': 'M0,0 H20 V20 H0 Z',
+  'arch': 'M0,20 H20 V10 C20,4.5 15.5,0 10,0 C4.5,0 0,4.5 0,10 Z',
+  'shield': 'M10,0 L20,5 V12 C20,16.5 15.5,20 10,20 C4.5,20 0,16.5 0,12 V5 Z',
+  'flag': 'M0,0 H20 V15 L15,12.5 L10,15 L5,12.5 L0,15 Z',
+  'ribbon': 'M0,0 H20 V25 L10,20 L0,25 Z',
+  'chevron': 'M0,0 H20 V15 L10,20 L0,15 Z'
+};
+
+// Accept all required props including onShowEditModal
+const MapView = ({ 
+  mapId, 
+  onPinClick, 
+  onDeletePin, 
+  pinsLocked, 
+  onUpdatePinPosition, 
+  onShowLinkModal,
+  onShowEditModal 
+}) => {
   const [mapData, setMapData] = useState(null);
   const [imageLoaded, setImageLoaded] = useState(false); // State to track image load
   const mapImageRef = useRef(null);
@@ -50,29 +71,26 @@ const MapView = ({ mapId, onPinClick, onDeletePin, pinsLocked, onUpdatePinPositi
     position: 'relative' // Needed for absolute positioning of pins
   };
 
-  const pinStyle = {
-    position: 'absolute',
-    width: '10px',
-    height: '10px',
-    backgroundColor: 'red',
-    borderRadius: '50%',
-    cursor: 'pointer',
-    transform: 'translate(-50%, -50%)', // Center the pin on coordinates
-    border: '1px solid white'
-  };
-
-  const pinContainerStyle = {
-    position: 'absolute',
-    transform: 'translate(-50%, -50%)', // Center the container
-    zIndex: 5, // Keep pins above image but potentially below temp pin
-  };
-
-  // Need pin dimensions for Rnd size
-  const pinWidth = 10; // Must match pinStyle.width
-  const pinHeight = 10; // Must match pinStyle.height
+  // Base pin size in pixels (adjusting for SVG viewbox)
+  const pinWidth = 24; 
+  const pinHeight = 30;
 
   // Construct the full image URL
   const fullImageUrl = `http://localhost:5001${mapData.imageUrl}`;
+
+  // Function to get the appropriate icon component for a pin
+  const getPinIcon = (pin) => {
+    // Use pin's icon field as the actual icon name
+    if (pin.icon) {
+      return FaIcons[pin.icon] || FaIcons.FaHome;
+    } 
+    // Fallback to article's icon if available
+    else if (pin.article?.icon) {
+      return FaIcons[pin.article.icon] || FaIcons.FaHome;
+    }
+    // Default icon
+    return FaIcons.FaHome;
+  };
 
   // Updated context menu handler
   function handleContextMenu(event) {
@@ -109,26 +127,16 @@ const MapView = ({ mapId, onPinClick, onDeletePin, pinsLocked, onUpdatePinPositi
         if (pin) onPinClick(pin.article?._id);
         break;
       case "edit":
-        // Call new handler to open link modal
-        if (pin) onShowLinkModal({ pin }); 
-        // alert(`Edit functionality for pin ${pin._id} not yet implemented.`);
+        // Now calls the edited modal handler
+        if (pin) onShowEditModal({ pin }); 
         break;
       case "remove":
         if (pin) onDeletePin(pin._id);
         break;
       // Map Menu Actions
       case "add_pin":
-        // Call new handler to open link modal
+        // Call new handler to open link modal for coordinates
         if (coords) onShowLinkModal({ coords });
-        /* 
-        console.log("Context menu: Add pin at", coords);
-        const articleTitle = window.prompt("Enter the EXACT title of the article to link:");
-        if (articleTitle && articleTitle.trim() !== "") {
-          onPlacePin({ ...coords, articleTitle: articleTitle.trim() });
-        } else {
-          alert("Pin cancelled.");
-        }
-        */
         break;
       default:
         console.log("Unknown menu item clicked");
@@ -141,15 +149,85 @@ const MapView = ({ mapId, onPinClick, onDeletePin, pinsLocked, onUpdatePinPositi
     if (!mapImageRef.current) return;
 
     const rect = mapImageRef.current.getBoundingClientRect();
-    // Calculate percentage, accounting for pin being centered on cursor
-    const xPercent = (d.x + pinWidth / 2) / rect.width;
-    const yPercent = (d.y + pinHeight / 2) / rect.height;
+    
+    // Calculate percentage
+    const xPercent = d.x / rect.width;
+    const yPercent = d.y / rect.height;
 
     const clampedX = Math.max(0, Math.min(1, xPercent));
     const clampedY = Math.max(0, Math.min(1, yPercent));
 
     console.log(`Pin ${pinId} dragged to (Rnd): x=${clampedX}, y=${clampedY}`);
     onUpdatePinPosition(pinId, { x: clampedX, y: clampedY });
+  };
+  
+  // Render a pin with customized styling using SVG
+  const renderPin = (pin) => {
+    const displayType = pin.displayType || 'pin+icon';
+    const pinColor = pin.color || '#dc3545';
+    const shapePath = PIN_SHAPES[pin.shape || 'pin'] || PIN_SHAPES.pin;
+    const IconComponent = getPinIcon(pin);
+    
+    // Don't show the shape if icon-only mode
+    if (displayType === 'icon-only') {
+      return (
+        <div className="map-pin icon-only-pin" style={{ 
+          backgroundColor: pinColor,
+          padding: '4px',
+          borderRadius: '50%',
+          border: '2px solid #fff',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          width: '100%',
+          height: '100%'
+        }}>
+          <IconComponent color="#fff" size="80%" />
+        </div>
+      );
+    }
+    
+    // For pin+icon or hide-icon modes, render the SVG shape
+    return (
+      <div className="map-pin-container" style={{ 
+        position: 'relative', 
+        width: '100%', 
+        height: '100%',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center'
+      }}>
+        <svg width="100%" height="100%" viewBox="0 0 20 30" xmlns="http://www.w3.org/2000/svg" 
+          style={{
+            filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.5))',
+          }}>
+          <path d={shapePath} fill={pinColor} stroke="#fff" strokeWidth="1"/>
+        </svg>
+        
+        {/* Only show icon if not in hide-icon mode */}
+        {displayType !== 'hide-icon' && (
+          <div style={{ 
+            position: 'absolute',
+            top: pin.shape === 'pin' ? '20%' : '25%', 
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            color: '#fff',
+            zIndex: 2,
+            backgroundColor: 'rgba(0,0,0,0.4)',
+            borderRadius: '50%',
+            padding: '2px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            width: '12px',
+            height: '12px',
+          }}>
+            <IconComponent size="90%" />
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -171,8 +249,8 @@ const MapView = ({ mapId, onPinClick, onDeletePin, pinsLocked, onUpdatePinPositi
             {/* Only render pins if image is loaded and dimensions are likely available */}
             {imageLoaded && mapData.pins && mapData.pins.map((pin, index) => {
               // Rnd needs position and size in pixels.
-              const initialX = (mapImageRef.current ? pin.x * mapImageRef.current.offsetWidth - pinWidth / 2 : 0);
-              const initialY = (mapImageRef.current ? pin.y * mapImageRef.current.offsetHeight - pinHeight / 2 : 0);
+              const initialX = pin.x * mapImageRef.current.offsetWidth;
+              const initialY = pin.y * mapImageRef.current.offsetHeight;
 
               return (
                 <Rnd
@@ -198,26 +276,17 @@ const MapView = ({ mapId, onPinClick, onDeletePin, pinsLocked, onUpdatePinPositi
                         const title = pin.article?.title || 'Linked Article';
                         tippy(node, {
                           content: title,
-                          delay: [0, 0],
+                          delay: [300, 0], // Small delay to prevent flicker during interactions
                           placement: 'top',
                           arrow: true,
                         });
-                        // Log the element being assigned to the ref
-                        console.log(`Pin Render ${index}: Ref/Tippy assigned to`, node);
-                      } else {
-                        // Optional: Handle cleanup if element is removed? 
-                        // Tippy should handle this if node._tippy exists and node is removed
                       }
                     }}
                     data-pin-id={pin._id}
-                    style={{ 
-                       ...pinStyle,
-                       // Override position/transform from pinStyle as Rnd handles it
-                       position: 'static', 
-                       transform: 'none', 
-                       width: '100%', // Fill the Rnd wrapper
-                       height: '100%',
-                       cursor: pinsLocked ? 'pointer' : 'move',
+                    style={{
+                      width: '100%', 
+                      height: '100%',
+                      cursor: pinsLocked ? 'pointer' : 'move',
                     }}
                     onClick={(e) => { 
                       if (pinsLocked) {
@@ -229,7 +298,9 @@ const MapView = ({ mapId, onPinClick, onDeletePin, pinsLocked, onUpdatePinPositi
                       e.stopPropagation(); 
                       handleContextMenu(e); 
                     }}
-                  />
+                  >
+                    {renderPin(pin)}
+                  </div>
                 </Rnd>
               );
             })}

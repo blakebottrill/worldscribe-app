@@ -63,41 +63,32 @@ exports.createArticle = async (req, res) => {
 // @route   PUT /api/articles/:id
 // @access  Private // TODO: Add auth
 exports.updateArticle = async (req, res) => {
-  const { title, body, tags, icon } = req.body;
-  
-  const articleFields = {};
-  if (title) articleFields.title = title;
-  if (body) articleFields.body = body;
-  // Add icon to fields if provided
-  if (icon) articleFields.icon = icon;
-  
-  // Check if tags exist, then handle them based on type
-  if (tags !== undefined) {
-    // If tags is a string, split it; otherwise, assume it's already the proper format
-    articleFields.tags = typeof tags === 'string' ? 
-      tags.split(',').map(tag => tag.trim()).filter(Boolean) : 
-      tags; // Just use as-is
-  }
-  
-  // We also update the `updatedAt` field automatically via schema middleware
-
   try {
-    let article = await Article.findById(req.params.id);
-
-    if (!article) return res.status(404).json({ msg: 'Article not found' });
-
-    // TODO: Add authorization check (ensure user owns the article)
-
-    article = await Article.findByIdAndUpdate(
+    // Build the article update object from incoming data
+    const { title, body, icon, iconId, tags } = req.body;
+    
+    // Build the article fields object with only the provided fields
+    const articleFields = {};
+    if (title) articleFields.title = title;
+    if (body !== undefined) articleFields.body = body; // Allow empty body
+    if (icon) articleFields.icon = icon;
+    if (iconId !== undefined) articleFields.iconId = iconId; // Allow null
+    if (tags !== undefined) articleFields.tags = tags;  // Allow empty tags
+    
+    // Update record
+    const article = await Article.findByIdAndUpdate(
       req.params.id,
       { $set: articleFields },
       { new: true } // Return the updated document
     );
-
+    
+    if (!article) {
+      return res.status(404).json({ msg: 'Article not found' });
+    }
+    
     res.json(article);
   } catch (err) {
     console.error(err.message);
-    // If the ID format is invalid
     if (err.kind === 'ObjectId') {
       return res.status(404).json({ msg: 'Article not found' });
     }
