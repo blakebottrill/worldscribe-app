@@ -24,6 +24,12 @@
   font-family: inherit;
   border-radius: 0; /* Remove button radius */
   transition: background-color 0.15s ease-in-out;
+  /* Remove default focus outline globally for these buttons */
+}
+.article-list-button:focus,
+.article-list-button:focus-visible {
+  outline: none;
+  box-shadow: none; 
 }
 
 .article-list-item:last-child .article-list-button {
@@ -35,9 +41,18 @@
 }
 
 .article-list-item.selected .article-list-button {
-  background-color: #dbeafe; /* Light blue background for selected */
-  /* Optionally make text bolder */
-  /* font-weight: 600; */ 
+  /* Style for selected state (background/color) */
+  background-color: #4b5563; 
+  color: white; 
+  /* No need for outline: none here anymore */
+}
+
+/* Ensure nested elements inherit the white color when selected */
+.article-list-item.selected .article-list-button .article-title,
+.article-list-item.selected .article-list-button .article-list-icon,
+.article-list-item.selected .article-list-button .article-tags,
+.article-list-item.selected .article-list-button .article-date {
+  color: white;
 }
 
 .article-list-item-content {

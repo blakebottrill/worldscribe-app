@@ -68,8 +68,10 @@ button:hover {
 }
 button:focus,
 button:focus-visible {
-  outline: 2px solid var(--link-color);
-  outline-offset: 2px;
+  /* Remove the default blue outline globally */
+  outline: none;
+  /* Optionally add a subtle box-shadow for accessibility if desired, but removing outline per request */
+  /* box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.25); */ 
 }
 
 /* Remove conflicting global nav styles */

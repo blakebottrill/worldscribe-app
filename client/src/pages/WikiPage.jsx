@@ -80,10 +80,13 @@ const WikiPage = () => {
 
   // Effect to deselect if filtered out (based on editingArticleData now)
   useEffect(() => {
-    if (editingArticleData && !filteredArticles.some(a => a._id === editingArticleData._id)) {
+    // FIX: Only clear if it's an EXISTING article (has _id) that's no longer in the filtered list
+    if (editingArticleData && editingArticleData._id && !filteredArticles.some(a => a._id === editingArticleData._id)) {
+      console.log("Clearing editor because selected article is no longer in the filtered list.");
       setEditingArticleData(null); // Clear editor if article disappears from list
       setSelectedArticleId(null);
     }
+    // Do NOT clear if editingArticleData exists but has no _id (i.e., it's a new article)
   }, [filteredArticles, editingArticleData]);
 
   // Effect to handle selection via navigation state (sets editingArticleData)
@@ -118,16 +121,43 @@ const WikiPage = () => {
     setSelectedArticleId(article._id);
   };
 
-  // Add New: Clears selection, sets blank data for editor
+  // Add New: Now adds optimistically to the list
   const handleAddNewClick = () => {
-    setEditingArticleData({ title: '', body: '', tags: '' });
-    setSelectedArticleId(null); // Ensure no item is highlighted
+    const tempId = `temp-${Date.now()}`; // Generate temporary client-side ID
+    const newArticleDefaults = { 
+      _id: tempId, // Use temporary ID
+      title: 'Untitled', 
+      body: '', // CHANGED: Start with truly empty body for placeholder
+      tags: [], // Start with empty array internally for consistency
+      icon: 'FaBook',
+      // createdAt/updatedAt will be added by backend
+    };
+
+    // Add to the beginning of the articles list optimistically
+    setArticles(prevArticles => [newArticleDefaults, ...prevArticles]);
+
+    // Set for editing
+    setEditingArticleData({ ...newArticleDefaults, tags: '' }); // Keep tags as string for editor input initially
+    setSelectedArticleId(tempId); // Select the new article with temp ID
   };
 
   // Delete Click: Needs to clear editor if deleting the edited article
-  const handleDeleteClick = async (articleToDelete) => { // Pass the article to delete
-    if (!articleToDelete) return; 
+  const handleDeleteClick = async (articleToDelete) => { 
+    if (!articleToDelete) return;
+    
+    // If it's a temporary article, just remove it locally
+    if (String(articleToDelete._id).startsWith('temp-')) {
+      if (window.confirm(`Are you sure you want to delete "${articleToDelete.title}"?`)) {
+         setArticles(prev => prev.filter(a => a._id !== articleToDelete._id));
+         if (editingArticleData?._id === articleToDelete._id) {
+            setEditingArticleData(null);
+            setSelectedArticleId(null);
+         }
+      }
+      return; // Don't send DELETE request to backend
+    }
 
+    // Existing logic for saved articles
     if (window.confirm(`Are you sure you want to delete "${articleToDelete.title}"?`)) {
       console.log(`Deleting article with ID: ${articleToDelete._id}`);
       setError(null);
@@ -151,70 +181,76 @@ const WikiPage = () => {
     }
   };
 
-  // Cancel Edit: Now clears the editor pane
+  // Cancel Edit: Now also removes temporary article if cancelled before first save
   const handleCancelEdit = () => {
+    // If cancelling a temporary article, remove it from the list
+    if (editingArticleData && String(editingArticleData._id).startsWith('temp-')) {
+        setArticles(prev => prev.filter(a => a._id !== editingArticleData._id));
+    }
     setEditingArticleData(null);
     setSelectedArticleId(null);
   };
 
-  // Save Article: Update state locally on update, refetch only on create
+  // Save Article: Update state locally, replace temp ID on create
   const handleSaveArticle = async (articleData) => {
-    const isUpdating = editingArticleData && editingArticleData._id;
-    const articleId = isUpdating ? editingArticleData._id : null;
-    const url = isUpdating 
-      ? `http://localhost:5001/api/articles/${articleId}` 
-      : 'http://localhost:5001/api/articles';
-    const method = isUpdating ? 'PUT' : 'POST';
+    // Check if we are creating a new article (using temp ID)
+    const isCreating = String(articleData._id).startsWith('temp-');
+    const tempId = isCreating ? articleData._id : null;
+    
+    const url = isCreating 
+      ? 'http://localhost:5001/api/articles' 
+      : `http://localhost:5001/api/articles/${articleData._id}`; // Use real ID for updates
+    const method = isCreating ? 'POST' : 'PUT';
 
-    console.log(`Saving article (Method: ${method}) - Body:`, articleData.body.substring(0,50)); // Log less
+    // Prepare data payload - exclude _id for POST
+    const payload = {
+      title: articleData.title,
+      body: articleData.body,
+      tags: articleData.tags,
+      icon: articleData.icon,
+    };
+
+    console.log(`Saving article (Method: ${method}, TempID: ${tempId})`);
     setError(null);
-    // We don't set isSaving state here anymore, editor handles its own status
     
     try {
       const response = await fetch(url, {
         method: method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ // Only send fields being saved
-          title: articleData.title,
-          body: articleData.body,
-          tags: articleData.tags, // Assuming tags are sent as comma-separated string
-          icon: articleData.icon, // *** Add the icon field ***
-        }),
+        body: JSON.stringify(payload),
       });
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ msg: `Failed to ${isUpdating ? 'update' : 'save'} article` }));
+        const errorData = await response.json().catch(() => ({ msg: `Failed to ${method === 'POST' ? 'create' : 'update'} article` }));
+        // If creation failed, remove the optimistic article
+        if (isCreating) {
+             setArticles(prev => prev.filter(a => a._id !== tempId));
+             setEditingArticleData(null); // Optionally clear editor
+             setSelectedArticleId(null);
+        }
         throw new Error(errorData.msg || `HTTP error! status: ${response.status}`);
       }
+
       const savedArticle = await response.json();
 
-      if (isUpdating) {
-        // Update state locally for the edited article
-        setArticles(prevArticles => 
-          prevArticles.map(a => 
-            a._id === savedArticle._id ? savedArticle : a
-          )
-        );
-        // Update the editor data to reflect saved state (including potentially new updatedAt)
-        setEditingArticleData(prev => ({...prev, ...savedArticle, tags: savedArticle.tags?.join(', ') || ''}));
-        setSelectedArticleId(savedArticle._id);
-        console.log("Local state updated after save.");
-      } else {
-        // Refetch the whole list only when creating a new article
-        await fetchArticles(); 
-        // Set the new article as the one being edited
-        setEditingArticleData({ ...savedArticle, tags: savedArticle.tags?.join(', ') || ''});
-        setSelectedArticleId(savedArticle._id);
-        console.log("Refetched articles after creating new.");
-      }
+      // Update state: Replace temp article or update existing
+      setArticles(prevArticles => 
+        prevArticles.map(a => 
+          a._id === (isCreating ? tempId : savedArticle._id) 
+            ? savedArticle // Replace temp or update existing
+            : a
+        )
+      );
       
-      // The ArticleEditor component handles its own save status UI
-      // So no need to return anything specific here unless error handling needs it.
+      // Update the editor data to reflect saved state (including real _id)
+      setEditingArticleData({ ...savedArticle, tags: savedArticle.tags?.join(', ') || '' });
+      setSelectedArticleId(savedArticle._id); // Ensure selection uses real ID now
+      console.log(`Article ${isCreating ? 'created' : 'updated'} successfully.`);
 
     } catch (e) {
-      console.error(`Failed to ${isUpdating ? 'update' : 'save'} article:`, e);
-      setError(`Failed to ${isUpdating ? 'update' : 'save'} article: ${e.message}`);
-      // Rethrow the error so the editor component knows save failed
-      throw e; 
+      console.error(`Failed to ${isCreating ? 'create' : 'update'} article:`, e);
+      setError(`Failed to ${isCreating ? 'create' : 'update'} article: ${e.message}`);
+      throw e; // Rethrow for ArticleEditor
     }
   };
 
@@ -298,6 +334,37 @@ const WikiPage = () => {
     }
   };
 
+  // --- REALTIME TITLE UPDATE HANDLER --- 
+  const handleTitleChangeRealtime = (newTitle) => {
+    // Only update if an article is being edited
+    if (editingArticleData && editingArticleData._id) {
+      setArticles(prevArticles => 
+        prevArticles.map(a => 
+          a._id === editingArticleData._id ? { ...a, title: newTitle } : a
+        )
+      );
+      // Also update the title in editingArticleData to keep it consistent
+      setEditingArticleData(prev => ({ ...prev, title: newTitle }));
+    }
+    // If it's a *new* article (no _id yet), we don't need to update the list
+    // but we do need to update the editor's temporary state
+    else if (editingArticleData) { 
+        setEditingArticleData(prev => ({ ...prev, title: newTitle }));
+    }
+  };
+
+  // --- MENTION CLICK HANDLER --- 
+  const handleMentionClick = (articleId) => {
+    console.log("Handling mention click for ID:", articleId);
+    const targetArticle = articles.find(a => a._id === articleId);
+    if (targetArticle) {
+      handleSelectArticle(targetArticle); // Use existing selection logic
+    } else {
+      console.warn("Mentioned article not found in current list, ID:", articleId);
+      // Optionally show an error to the user
+    }
+  };
+
   return (
     <div className="wiki-page-layout">
       {/* Left Pane: Search, Tabs, AI Gen, List */}
@@ -346,6 +413,7 @@ const WikiPage = () => {
                articles={filteredArticles} 
                selectedArticleId={selectedArticleId} // Pass ID for highlighting
                onSelectArticle={handleSelectArticle} 
+               onDelete={handleDeleteClick} // Pass delete handler
              />
            )}
         </div>
@@ -366,8 +434,9 @@ const WikiPage = () => {
             onSave={handleSaveArticle} 
             onCancel={handleCancelEdit} 
             onShowMentionLinkModal={handleShowEditorLinkModal}
-            // Add onDelete prop to editor?
-            onDelete={() => handleDeleteClick(editingArticleData)} // Pass delete handler for the current article
+            onDelete={() => handleDeleteClick(editingArticleData)} 
+            onTitleChangeRealtime={handleTitleChangeRealtime} 
+            onMentionClick={handleMentionClick} // Pass the handler down
           />
         ) : (
           <div className="welcome-message">

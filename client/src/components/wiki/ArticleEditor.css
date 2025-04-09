@@ -114,4 +114,29 @@
 
 .remove-tag-button:hover {
   color: #dc3545; /* Red color on hover */
+}
+
+#tag-input:focus {
+  outline: none;
+  border-color: #ced4da; /* Optional: Keep a subtle border color on focus or remove */
+  box-shadow: none; /* Remove any default box-shadow focus indicators */
+}
+
+/* --- Tiptap Editor --- */
+.tiptap-editor:focus {
+  outline: none; /* Remove default blue outline */
+  border-color: #ced4da; /* Optional: Keep border color consistent on focus */
+}
+
+/* --- Tiptap Placeholder --- */
+/* 
+  Styles for the Tiptap placeholder extension.
+  Targets the first and only empty paragraph node within the editor.
+*/
+.tiptap-editor > p.is-empty:first-child:last-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #adb5bd; /* Placeholder text color */
+  pointer-events: none;
+  height: 0;
 } 

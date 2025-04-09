@@ -8,7 +8,7 @@ const ArticleSchema = new mongoose.Schema({
   },
   body: {
     type: String, // Markdown content
-    required: true
+    // required: true // REMOVED: Body is no longer required
   },
   icon: {
     type: String,

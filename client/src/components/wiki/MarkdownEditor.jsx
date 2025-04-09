@@ -109,13 +109,28 @@ const MentionsExtension = Extension.create({
   },
 });
 
-const MarkdownEditor = forwardRef(({ content, onChange, articles, onShowMentionLinkModal, placeholder = 'Start writing...' }, ref) => {
+const MarkdownEditor = forwardRef(({ content, onChange, articles, onShowMentionLinkModal, onMentionClick }, ref) => {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
       }),
-      Placeholder.configure({ placeholder }),
+      Placeholder.configure({ 
+        // Keep placeholder text generation per-node
+        placeholder: ({ node }) => {
+          if (node.type.name === 'paragraph' && node.content.size === 0) {
+            return 'Type / for commands or @ to mention...';
+          }
+          return '';
+        },
+        // Custom logic for applying the empty node class
+        emptyNodeClass: 'is-empty', // The class to apply
+        showOnlyWhenEditable: true,
+        // Only apply the class if the *entire document* is considered empty
+        // (Tiptap considers a single empty paragraph as empty)
+        showOnlyCurrent: false, // Apply to all applicable nodes if needed (default)
+        includeChildren: false, // Check children (default false, might not be needed here)
+      }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Image,
@@ -142,7 +157,26 @@ const MarkdownEditor = forwardRef(({ content, onChange, articles, onShowMentionL
     },
     editorProps: {
       attributes: {
-        class: 'focus:outline-none p-2 border border-gray-300 rounded min-h-[200px]',
+        // Ensure the main editor element can be targeted by CSS
+        class: 'tiptap-editor focus:outline-none p-4 border border-gray-300 rounded min-h-[300px]', 
+      },
+      handleClickOn: (view, pos, node, nodePos, event, direct) => {
+        // Check if the click was directly on a node with our mentionMark
+        const marks = view.state.doc.resolve(pos).marks();
+        const mentionMark = marks.find(mark => mark.type.name === 'mentionMark');
+
+        if (mentionMark && direct) { // Ensure direct click on the mark
+          const mentionId = mentionMark.attrs.id;
+          if (mentionId && onMentionClick) {
+            console.log("Mention clicked, ID:", mentionId);
+            // Prevent default link behavior if it was rendered as <a>
+            event.preventDefault(); 
+            // Call the handler passed from parent
+            onMentionClick(mentionId);
+            return true; // Indicate we handled the click
+          }
+        }
+        return false; // Default click handling
       },
     },
   });

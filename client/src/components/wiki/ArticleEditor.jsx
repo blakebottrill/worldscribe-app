@@ -10,8 +10,8 @@ const getIconComponent = (iconName) => {
   return FaIcons[iconName] || FaIcons.FaBook;
 };
 
-// Accept articles and onShowMentionLinkModal and onDelete
-const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionLinkModal, onDelete }) => {
+// Accept articles and onShowMentionLinkModal and onDelete, and new onTitleChangeRealtime and onMentionClick
+const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionLinkModal, onDelete, onTitleChangeRealtime, onMentionClick }) => {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [tagList, setTagList] = useState([]); // New state for tags array
@@ -53,10 +53,16 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
     }
   }, [initialData]);
 
-  // Title change handler with debounced save
+  // Title change handler with debounced save AND realtime update
   const handleTitleChange = (e) => {
     const newTitle = e.target.value;
     setTitle(newTitle);
+    
+    // Call the realtime update prop immediately
+    if (onTitleChangeRealtime) {
+      onTitleChangeRealtime(newTitle);
+    }
+    
     // Pass the complete intended state to debouncedSave
     debouncedSave({ 
       title: newTitle, 
@@ -220,6 +226,7 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
         onChange={handleBodyChange}
         articles={articles} // Pass articles for mention suggestions
         onShowMentionLinkModal={onShowMentionLinkModal} // Pass modal trigger
+        onMentionClick={onMentionClick} // Pass prop down
         ref={editorRef} // Forward ref if needed
       />
 
