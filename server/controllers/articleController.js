@@ -63,16 +63,22 @@ exports.createArticle = async (req, res) => {
 // @route   PUT /api/articles/:id
 // @access  Private // TODO: Add auth
 exports.updateArticle = async (req, res) => {
-  // Destructure icon from req.body
   const { title, body, tags, icon } = req.body;
-
-  // Build article object
+  
   const articleFields = {};
   if (title) articleFields.title = title;
   if (body) articleFields.body = body;
   // Add icon to fields if provided
   if (icon) articleFields.icon = icon;
-  if (tags) articleFields.tags = tags.split(',').map(tag => tag.trim());
+  
+  // Check if tags exist, then handle them based on type
+  if (tags !== undefined) {
+    // If tags is a string, split it; otherwise, assume it's already the proper format
+    articleFields.tags = typeof tags === 'string' ? 
+      tags.split(',').map(tag => tag.trim()).filter(Boolean) : 
+      tags; // Just use as-is
+  }
+  
   // We also update the `updatedAt` field automatically via schema middleware
 
   try {

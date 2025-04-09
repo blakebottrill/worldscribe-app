@@ -19,179 +19,158 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
   const [icon, setIcon] = useState('FaBook'); // Add state for icon name
   const [showIconPicker, setShowIconPicker] = useState(false); // State for modal
   const editorRef = useRef(null); // Ref to access editor instance if needed elsewhere
-  const debounceTimeoutRef = useRef(null);
-  const isMountedRef = useRef(false);
-  const prevArticleIdRef = useRef(null);
-  // Refs to store previous values for comparison in auto-save effect
-  const prevSaveDataRef = useRef({});
+  // Track if initial data has been loaded
+  const initialDataLoadedRef = useRef(false);
+  // Track if we're in the middle of a save operation
+  const isSavingRef = useRef(false);
 
+  // Handle initialData changes (e.g., when navigating between articles)
   useEffect(() => {
-    const currentArticleId = initialData?._id;
-
-    if (currentArticleId !== prevArticleIdRef.current || !initialData) {
-      console.log('Article ID changed or initialData is null/undefined. Resetting editor state.');
-      setTitle(initialData?.title || '');
-      setBody(initialData?.body || '');
-      // Assume initialData.tags is already an array (or null/undefined)
-      setTagList(initialData?.tags || []); 
-      setTagInput(''); 
-      setIcon(initialData?.icon || 'FaBook');
-      isMountedRef.current = !!initialData; 
-      prevSaveDataRef.current = { 
-         title: initialData?.title || '',
-         body: initialData?.body || '',
-         // Store tags as array stringified for comparison
-         tagsString: JSON.stringify(initialData?.tags || []), 
-         icon: initialData?.icon || 'FaBook'
-      }; 
+    if (initialData) {
+      setTitle(initialData.title || '');
+      setBody(initialData.body || '');
       
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-        console.log('Cleared pending save due to article change.');
-      }
-    } 
-    else if (initialData && !debounceTimeoutRef.current) { 
-      console.log('InitialData changed (same ID, no save pending). Updating non-input fields if necessary.');
-      if (initialData.title !== title) setTitle(initialData.title);
-      if (initialData.body !== body) setBody(initialData.body);
-      // Assume initialData.tags is an array
-      const newTagList = initialData.tags || []; 
-      if (JSON.stringify(newTagList) !== JSON.stringify(tagList)) {
-         console.log('Updating tagList from initialData as it differs and no save is pending.');
-         setTagList(newTagList); 
-      }
-      if (initialData.icon !== icon) setIcon(initialData.icon || 'FaBook');
-      prevSaveDataRef.current = {
-         title: initialData.title, 
-         body: initialData.body, 
-         // Store tags as array stringified for comparison
-         tagsString: JSON.stringify(initialData.tags || []), 
-         icon: initialData.icon || 'FaBook' 
-      };
-    } else if (initialData && debounceTimeoutRef.current) {
-        console.log('InitialData changed but save is pending. Skipping state overwrite.');
+      // Parse tags from comma-separated string
+      const parsedTags = initialData.tags 
+        ? initialData.tags.split(',').map(tag => tag.trim()).filter(Boolean) 
+        : [];
+      setTagList(parsedTags);
+      
+      setTagInput('');
+      setIcon(initialData.icon || 'FaBook');
+      initialDataLoadedRef.current = true;
+    } else {
+      // Reset fields if initialData becomes null
+      setTitle('');
+      setBody('');
+      setTagList([]);
+      setTagInput('');
+      setIcon('FaBook');
+      initialDataLoadedRef.current = false;
     }
-
-    prevArticleIdRef.current = currentArticleId;
-
   }, [initialData]);
 
-  // Debounced Save Logic - Update comparison ref value
-  useEffect(() => {
-    if (!isMountedRef.current) {
-      // Don't run on initial mount before data is stable
-      // isMountedRef is set to true in the initialData effect
-      return;
-    }
+  // Title change handler with debounced save
+  const handleTitleChange = (e) => {
+    const newTitle = e.target.value;
+    setTitle(newTitle);
+    debouncedSave({ title: newTitle });
+  };
 
-    const currentData = {
-      title,
-      body,
-      // Use stringified array for comparison logic
-      tagsString: JSON.stringify(tagList), 
-      icon,
-      _id: initialData?._id
-    };
-
-    const hasDataChanged = 
-      currentData.title !== prevSaveDataRef.current.title ||
-      currentData.body !== prevSaveDataRef.current.body ||
-      // Compare stringified arrays
-      currentData.tagsString !== prevSaveDataRef.current.tagsString || 
-      currentData.icon !== prevSaveDataRef.current.icon;
-
-    if (hasDataChanged) {
-        console.log('Data changed, scheduling auto-save...', currentData);
-        if (debounceTimeoutRef.current) {
-            clearTimeout(debounceTimeoutRef.current);
-        }
-
-        // Condition needs to check stringified empty array
-        const isEmptyNewArticle = !currentData._id && !(currentData.title || currentData.body || currentData.tagsString !== '[]' || currentData.icon !== 'FaBook');
-        
-        if (!isEmptyNewArticle) {
-            debounceTimeoutRef.current = setTimeout(async () => {
-                if (!isMountedRef.current) return;
-                
-                // Send tags as comma-separated string
-                const tagsToSend = tagList.join(',');
-                console.log("Executing auto-save with tags string:", tagsToSend);
-                try {
-                    await onSave({ 
-                        _id: currentData._id, 
-                        title: currentData.title, 
-                        body: currentData.body, 
-                        tags: tagsToSend, // Send string
-                        icon: currentData.icon 
-                    });
-                    console.log("Auto-save successful.");
-                    // Update the ref *after* successful save, store stringified array
-                    prevSaveDataRef.current = { ...currentData, tagsString: JSON.stringify(tagList) }; 
-                } catch (error) {
-                    console.error("Auto-save failed:", error);
-                }
-            }, 1000);
-        } else {
-             console.log("Skipping save schedule for new/empty article.");
-        }
-    } 
-
-    // Update previous data ref - store stringified array
-    if (hasDataChanged) {
-       prevSaveDataRef.current = { ...currentData, tagsString: JSON.stringify(tagList) };
-    }
-
-    // Cleanup function
-    return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-    };
-    // Keep dependencies that define the data being saved
-  }, [title, body, tagList, icon, initialData?._id, onSave]); 
-
+  // Body change handler with debounced save
   const handleBodyChange = useCallback((newBody) => {
     setBody(newBody);
+    debouncedSave({ body: newBody });
   }, []);
 
-  const handleDelete = () => {
-    // Confirmation is handled in WikiPage, just call the prop
-    if (onDelete && initialData?._id) { // Only allow delete if it's an existing article
-      onDelete();
-    }
-  };
-
-  // Handler for when an icon is selected from the picker
+  // Icon change handler with immediate save
   const handleIconSelect = (selectedIconName) => {
     setIcon(selectedIconName);
-    // Auto-save will be triggered by the state change via useEffect
+    saveArticle({ icon: selectedIconName });
   };
 
-  // --- Tag Input Handlers ---
+  // Handle tag input key events (Enter to add tag)
   const handleTagKeyDown = (e) => {
     if (e.key === 'Enter') {
-      e.preventDefault(); // Prevent form submission or newline
+      e.preventDefault();
       const newTagsRaw = tagInput.trim();
       
       if (newTagsRaw) {
-        // Split by comma, trim, filter empty strings and duplicates
         const newTags = newTagsRaw
           .split(',')
           .map(tag => tag.trim())
           .filter(tag => tag !== '' && !tagList.includes(tag));
           
         if (newTags.length > 0) {
-          setTagList([...tagList, ...newTags]);
+          const updatedTagList = [...tagList, ...newTags];
+          setTagList(updatedTagList);
+          
+          // Immediately save when tags are added
+          saveArticle({ tags: updatedTagList.join(',') });
         }
       }
-      setTagInput(''); // Clear the input field regardless
+      setTagInput('');
     }
   };
 
+  // Remove tag handler with immediate save
   const handleRemoveTag = (indexToRemove) => {
-    setTagList(tagList.filter((_, index) => index !== indexToRemove));
+    const updatedTagList = tagList.filter((_, index) => index !== indexToRemove);
+    setTagList(updatedTagList);
+    
+    // Immediately save when a tag is removed
+    // Send empty string if no tags remain to ensure consistency
+    saveArticle({ tags: updatedTagList.length ? updatedTagList.join(',') : '' });
   };
-  // --- End Tag Input Handlers ---
+
+  // Delete article handler
+  const handleDelete = () => {
+    if (onDelete && initialData?._id) {
+      onDelete();
+    }
+  };
+
+  // Debounce timer ref
+  const debounceTimerRef = useRef(null);
+
+  // Debounced save function (for content that changes frequently like title and body)
+  const debouncedSave = (changedFields) => {
+    if (!initialDataLoadedRef.current) return;
+    
+    // Clear any existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    // Set a new timer
+    debounceTimerRef.current = setTimeout(() => {
+      saveArticle(changedFields);
+    }, 1000);
+  };
+
+  // Function to save article with changed fields
+  const saveArticle = (changedFields) => {
+    if (!initialDataLoadedRef.current || isSavingRef.current) return;
+    
+    isSavingRef.current = true;
+    
+    // Make sure tags is always a string (even if empty)
+    let tagsToSave = '';
+    if (changedFields.tags !== undefined) {
+      tagsToSave = changedFields.tags; // Use provided value
+    } else if (tagList.length) {
+      tagsToSave = tagList.join(','); // Convert current tagList to string
+    }
+    
+    const articleData = {
+      _id: initialData?._id,
+      title: changedFields.title !== undefined ? changedFields.title : title,
+      body: changedFields.body !== undefined ? changedFields.body : body,
+      tags: tagsToSave, // Use our processed tags value
+      icon: changedFields.icon !== undefined ? changedFields.icon : icon
+    };
+    
+    console.log("Saving article with data:", articleData);
+    
+    onSave(articleData)
+      .then(() => {
+        console.log("Article saved successfully");
+        isSavingRef.current = false;
+      })
+      .catch(error => {
+        console.error("Failed to save article:", error);
+        isSavingRef.current = false;
+      });
+  };
+
+  // Clean up debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   const CurrentIcon = getIconComponent(icon); // Get current icon component
 
@@ -211,7 +190,7 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
           className="title-input"
           placeholder="Article Title"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={handleTitleChange}
           required
         />
       </div>
