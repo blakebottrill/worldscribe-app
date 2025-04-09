@@ -96,8 +96,8 @@ const WikiPage = () => {
            _id: articleToEdit._id, 
            title: articleToEdit.title,
            body: articleToEdit.body,
-           icon: articleToEdit.icon || 'FaBook', // *** Include Icon ***
-           tags: articleToEdit.tags ? articleToEdit.tags.join(', ') : ''
+           icon: articleToEdit.icon || 'FaBook',
+           tags: articleToEdit.tags || [] // Pass tags as array or empty array
          });
          setSelectedArticleId(articleToEdit._id);
          window.history.replaceState({}, document.title);
@@ -105,15 +105,15 @@ const WikiPage = () => {
      }
    }, [articles, location.state]);
 
-  // Select Article: Now directly sets data for the editor
+  // Select Article: Pass tags as array
   const handleSelectArticle = (article) => {
     console.log("Selected article to edit:", article.title);
     setEditingArticleData({
         _id: article._id, 
         title: article.title,
         body: article.body,
-        icon: article.icon || 'FaBook', // *** Include Icon ***
-        tags: article.tags ? article.tags.join(', ') : ''
+        icon: article.icon || 'FaBook', 
+        tags: article.tags || [] // Pass tags as array or empty array
     });
     setSelectedArticleId(article._id);
   };
@@ -157,7 +157,7 @@ const WikiPage = () => {
     setSelectedArticleId(null);
   };
 
-  // Save Article: Update state locally on update, refetch only on create
+  // Save Article: Pass tags as array
   const handleSaveArticle = async (articleData) => {
     const isUpdating = editingArticleData && editingArticleData._id;
     const articleId = isUpdating ? editingArticleData._id : null;
@@ -188,21 +188,21 @@ const WikiPage = () => {
       const savedArticle = await response.json();
 
       if (isUpdating) {
-        // Update state locally for the edited article
+        // Update articles list (already correct)
         setArticles(prevArticles => 
           prevArticles.map(a => 
             a._id === savedArticle._id ? savedArticle : a
           )
         );
-        // Update the editor data to reflect saved state (including potentially new updatedAt)
-        setEditingArticleData(prev => ({...prev, ...savedArticle, tags: savedArticle.tags?.join(', ') || ''}));
+        // Update the editor data, PASSING TAGS AS ARRAY
+        setEditingArticleData(prev => ({...prev, ...savedArticle, tags: savedArticle.tags || [] }));
         setSelectedArticleId(savedArticle._id);
         console.log("Local state updated after save.");
       } else {
-        // Refetch the whole list only when creating a new article
+        // Refetch (already correct)
         await fetchArticles(); 
-        // Set the new article as the one being edited
-        setEditingArticleData({ ...savedArticle, tags: savedArticle.tags?.join(', ') || ''});
+        // Set the new article, PASSING TAGS AS ARRAY
+        setEditingArticleData({ ...savedArticle, tags: savedArticle.tags || []});
         setSelectedArticleId(savedArticle._id);
         console.log("Refetched articles after creating new.");
       }

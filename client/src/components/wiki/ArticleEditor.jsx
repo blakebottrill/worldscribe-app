@@ -19,91 +19,136 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
   const [icon, setIcon] = useState('FaBook'); // Add state for icon name
   const [showIconPicker, setShowIconPicker] = useState(false); // State for modal
   const editorRef = useRef(null); // Ref to access editor instance if needed elsewhere
-  const debounceTimeoutRef = useRef(null); // Ref to store debounce timeout ID
-  const isMountedRef = useRef(false); // Ref to track if component is mounted
-  const prevArticleIdRef = useRef(null); // Ref to store the previous article ID
+  const debounceTimeoutRef = useRef(null);
+  const isMountedRef = useRef(false);
+  const prevArticleIdRef = useRef(null);
+  // Refs to store previous values for comparison in auto-save effect
+  const prevSaveDataRef = useRef({});
 
   useEffect(() => {
     const currentArticleId = initialData?._id;
 
-    // Only reset fully if the article ID changes OR if initialData becomes null/undefined
     if (currentArticleId !== prevArticleIdRef.current || !initialData) {
       console.log('Article ID changed or initialData is null/undefined. Resetting editor state.');
       setTitle(initialData?.title || '');
       setBody(initialData?.body || '');
-      setTagList(initialData?.tags ? initialData.tags.split(',').map(tag => tag.trim()).filter(Boolean) : []);
-      setTagInput(''); // Clear input field ONLY on article change/reset
+      // Assume initialData.tags is already an array (or null/undefined)
+      setTagList(initialData?.tags || []); 
+      setTagInput(''); 
       setIcon(initialData?.icon || 'FaBook');
-      isMountedRef.current = !!initialData; // Set mounted based on initialData presence
+      isMountedRef.current = !!initialData; 
+      prevSaveDataRef.current = { 
+         title: initialData?.title || '',
+         body: initialData?.body || '',
+         // Store tags as array stringified for comparison
+         tagsString: JSON.stringify(initialData?.tags || []), 
+         icon: initialData?.icon || 'FaBook'
+      }; 
       
-      // Clear any pending saves when switching articles
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
         console.log('Cleared pending save due to article change.');
       }
     } 
-    // If the ID is the same but the initialData object itself might have changed (e.g. parent refresh)
-    // Update state fields *except* tagInput to reflect potential upstream changes without disrupting typing.
-    else if (initialData) { 
-      console.log('InitialData reference changed but ID is the same. Updating non-input fields if necessary.');
+    else if (initialData && !debounceTimeoutRef.current) { 
+      console.log('InitialData changed (same ID, no save pending). Updating non-input fields if necessary.');
       if (initialData.title !== title) setTitle(initialData.title);
       if (initialData.body !== body) setBody(initialData.body);
-      const newTagList = initialData.tags ? initialData.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [];
-      // Use stringify for simple comparison of tag arrays to prevent infinite loops if parent updates initialData constantly
+      // Assume initialData.tags is an array
+      const newTagList = initialData.tags || []; 
       if (JSON.stringify(newTagList) !== JSON.stringify(tagList)) {
+         console.log('Updating tagList from initialData as it differs and no save is pending.');
          setTagList(newTagList); 
       }
       if (initialData.icon !== icon) setIcon(initialData.icon || 'FaBook');
+      prevSaveDataRef.current = {
+         title: initialData.title, 
+         body: initialData.body, 
+         // Store tags as array stringified for comparison
+         tagsString: JSON.stringify(initialData.tags || []), 
+         icon: initialData.icon || 'FaBook' 
+      };
+    } else if (initialData && debounceTimeoutRef.current) {
+        console.log('InitialData changed but save is pending. Skipping state overwrite.');
     }
 
-    // Update the ref for the next render comparison
     prevArticleIdRef.current = currentArticleId;
 
-  }, [initialData]); // Keep dependency on initialData object reference
+  }, [initialData]);
 
-  // Debounced Save Logic
+  // Debounced Save Logic - Update comparison ref value
   useEffect(() => {
-    // Don't save on the very first render or if initial data hasn't loaded yet
     if (!isMountedRef.current) {
+      // Don't run on initial mount before data is stable
+      // isMountedRef is set to true in the initialData effect
       return;
     }
-    
-    // Clear existing timeout if changes are rapid
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
+
+    const currentData = {
+      title,
+      body,
+      // Use stringified array for comparison logic
+      tagsString: JSON.stringify(tagList), 
+      icon,
+      _id: initialData?._id
+    };
+
+    const hasDataChanged = 
+      currentData.title !== prevSaveDataRef.current.title ||
+      currentData.body !== prevSaveDataRef.current.body ||
+      // Compare stringified arrays
+      currentData.tagsString !== prevSaveDataRef.current.tagsString || 
+      currentData.icon !== prevSaveDataRef.current.icon;
+
+    if (hasDataChanged) {
+        console.log('Data changed, scheduling auto-save...', currentData);
+        if (debounceTimeoutRef.current) {
+            clearTimeout(debounceTimeoutRef.current);
+        }
+
+        // Condition needs to check stringified empty array
+        const isEmptyNewArticle = !currentData._id && !(currentData.title || currentData.body || currentData.tagsString !== '[]' || currentData.icon !== 'FaBook');
+        
+        if (!isEmptyNewArticle) {
+            debounceTimeoutRef.current = setTimeout(async () => {
+                if (!isMountedRef.current) return;
+                
+                // Send tags as comma-separated string
+                const tagsToSend = tagList.join(',');
+                console.log("Executing auto-save with tags string:", tagsToSend);
+                try {
+                    await onSave({ 
+                        _id: currentData._id, 
+                        title: currentData.title, 
+                        body: currentData.body, 
+                        tags: tagsToSend, // Send string
+                        icon: currentData.icon 
+                    });
+                    console.log("Auto-save successful.");
+                    // Update the ref *after* successful save, store stringified array
+                    prevSaveDataRef.current = { ...currentData, tagsString: JSON.stringify(tagList) }; 
+                } catch (error) {
+                    console.error("Auto-save failed:", error);
+                }
+            }, 1000);
+        } else {
+             console.log("Skipping save schedule for new/empty article.");
+        }
+    } 
+
+    // Update previous data ref - store stringified array
+    if (hasDataChanged) {
+       prevSaveDataRef.current = { ...currentData, tagsString: JSON.stringify(tagList) };
     }
 
-    // Check if initialData (and thus _id) exists before attempting to save
-    // Modified check to include tagList length
-    if (!initialData?._id && !(title || body || tagList.length > 0 || icon !== 'FaBook')) {
-       console.log("Skipping initial auto-save for potentially new/empty article.");
-       return;
-    }
-    // Also check if component might have unmounted / initialData cleared by Cancel
-    if (!isMountedRef.current) { 
-      return;
-    }
-    
-    console.log("Auto-saving with tags:", tagList.join(','));
-    debounceTimeoutRef.current = setTimeout(async () => {
-      try {
-        // Convert tagList array back to comma-separated string for saving
-        const tagsString = tagList.join(',');
-        await onSave({ _id: initialData?._id, title, body, tags: tagsString, icon });
-        console.log("Auto-save successful.")
-      } catch (error) {
-        console.error("Auto-save failed:", error);
-        // Optionally add more visible error handling here?
-      }
-    }, 1000); // Auto-save after 1 second of inactivity (changed from 2000)
-
-    // Cleanup function to clear timeout if component unmounts or dependencies change before save
+    // Cleanup function
     return () => {
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
       }
     };
-  }, [title, body, tagList, icon, initialData?._id, onSave]); // Depend on tagList instead of tags
+    // Keep dependencies that define the data being saved
+  }, [title, body, tagList, icon, initialData?._id, onSave]); 
 
   const handleBodyChange = useCallback((newBody) => {
     setBody(newBody);
@@ -126,11 +171,20 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
   const handleTagKeyDown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault(); // Prevent form submission or newline
-      const newTag = tagInput.trim();
-      if (newTag && !tagList.includes(newTag)) {
-        setTagList([...tagList, newTag]);
+      const newTagsRaw = tagInput.trim();
+      
+      if (newTagsRaw) {
+        // Split by comma, trim, filter empty strings and duplicates
+        const newTags = newTagsRaw
+          .split(',')
+          .map(tag => tag.trim())
+          .filter(tag => tag !== '' && !tagList.includes(tag));
+          
+        if (newTags.length > 0) {
+          setTagList([...tagList, ...newTags]);
+        }
       }
-      setTagInput(''); // Clear the input field
+      setTagInput(''); // Clear the input field regardless
     }
   };
 
@@ -177,7 +231,7 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
         <input
           type="text"
           id="tag-input"
-          placeholder="Add a tag..."
+          placeholder="Add tags (comma-separated)..."
           value={tagInput}
           onChange={(e) => setTagInput(e.target.value)}
           onKeyDown={handleTagKeyDown}
