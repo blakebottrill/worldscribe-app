@@ -35,6 +35,12 @@ const MapView = ({
   const [mapData, setMapData] = useState(null);
   const [imageLoaded, setImageLoaded] = useState(false); // State to track image load
   const mapImageRef = useRef(null);
+  // Store transform state
+  const [transformState, setTransformState] = useState({
+    scale: 1,
+    positionX: 0,
+    positionY: 0
+  });
 
   // Use hook for both menus
   const { show } = useContextMenu();
@@ -106,9 +112,12 @@ const MapView = ({
       }
     } else if (mapImageRef.current?.contains(event.target)) { // Clicked on map area
        const rect = mapImageRef.current.getBoundingClientRect();
-       // Calculate click position relative to the image, as percentages
+       
+       // Use the same reliable approach as in handleDragStop
+       // Calculate relative position within the container
        const x = (event.clientX - rect.left) / rect.width;
        const y = (event.clientY - rect.top) / rect.height;
+       
        const clampedX = Math.max(0, Math.min(1, x));
        const clampedY = Math.max(0, Math.min(1, y));
        
@@ -145,19 +154,30 @@ const MapView = ({
 
   // Updated handler for when dragging stops with Rnd
   const handleDragStop = (e, d, pinId) => {
-    // d.x and d.y are the final pixel coordinates relative to the offset parent (the map container)
     if (!mapImageRef.current) return;
 
     const rect = mapImageRef.current.getBoundingClientRect();
     
-    // Calculate percentage
+    // Get the current scale, defaulting to 1 if not set
+    const scale = transformState.scale || 1;
+    
+    // Simplify the calculation - just use the basic ratio of position to container size
+    // This works regardless of zoom level because Rnd handles the scaling internally
+    // when we pass the scale prop to it
     const xPercent = d.x / rect.width;
     const yPercent = d.y / rect.height;
-
+    
+    // Ensure we have valid numbers before updating
+    if (isNaN(xPercent) || isNaN(yPercent)) {
+      console.error("Invalid coordinates calculated:", { x: xPercent, y: yPercent, scale });
+      return; // Don't update if we have invalid numbers
+    }
+    
+    // Clamp values to [0,1] range
     const clampedX = Math.max(0, Math.min(1, xPercent));
     const clampedY = Math.max(0, Math.min(1, yPercent));
 
-    console.log(`Pin ${pinId} dragged to (Rnd): x=${clampedX}, y=${clampedY}`);
+    console.log(`Pin ${pinId} dragged to: x=${clampedX}, y=${clampedY} (scale: ${scale})`);
     onUpdatePinPosition(pinId, { x: clampedX, y: clampedY });
   };
   
@@ -232,7 +252,27 @@ const MapView = ({
 
   return (
     <div style={containerStyle}>
-      <TransformWrapper>
+      <TransformWrapper
+        initialScale={1}
+        initialPositionX={0}
+        initialPositionY={0}
+        onInit={(state) => {
+          // Ensure transform state is initialized at component mount
+          setTransformState({
+            scale: state.instance.transformState.scale,
+            positionX: state.instance.transformState.positionX,
+            positionY: state.instance.transformState.positionY
+          });
+        }}
+        onTransformed={(state) => {
+          // Store current transformation state for pin positioning calculations
+          setTransformState({
+            scale: state.scale,
+            positionX: state.positionX,
+            positionY: state.positionY
+          });
+        }}
+      >
         <TransformComponent>
           <div 
             ref={mapImageRef}
@@ -248,7 +288,12 @@ const MapView = ({
             
             {/* Only render pins if image is loaded and dimensions are likely available */}
             {imageLoaded && mapData.pins && mapData.pins.map((pin, index) => {
-              // Rnd needs position and size in pixels.
+              if (!pin.x || !pin.y) {
+                console.warn(`Pin ${pin._id || index} has invalid coordinates:`, pin);
+                return null; // Skip rendering pins with invalid coordinates
+              }
+              
+              // Calculate absolute position in pixels
               const initialX = pin.x * mapImageRef.current.offsetWidth;
               const initialY = pin.y * mapImageRef.current.offsetHeight;
 
@@ -257,6 +302,7 @@ const MapView = ({
                   key={pin._id || index}
                   size={{ width: pinWidth, height: pinHeight }}
                   position={{ x: initialX, y: initialY }}
+                  scale={transformState.scale}
                   onDragStart={(e) => e.stopPropagation()} // Stop propagation on drag start
                   onDragStop={(e, d) => handleDragStop(e, d, pin._id)}
                   disableDragging={pinsLocked}

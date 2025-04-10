@@ -225,6 +225,14 @@ exports.updateMapPin = async (req, res) => {
       return res.status(400).json({ msg: 'No update data provided for pin.' });
   }
 
+  // Validate coordinates if they are provided
+  if ((x !== undefined && (isNaN(x) || x < 0 || x > 1)) || 
+      (y !== undefined && (isNaN(y) || y < 0 || y > 1))) {
+    return res.status(400).json({ 
+      msg: 'Invalid pin coordinates. X and Y must be numbers between 0 and 1.' 
+    });
+  }
+
   try {
     const map = await Map.findById(mapId);
     if (!map) {
