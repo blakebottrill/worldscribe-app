@@ -1,4 +1,6 @@
+const mongoose = require('mongoose'); // Add mongoose import
 const Article = require('../models/Article');
+const Map = require('../models/Map'); // Import Map model for pin updates
 
 // @desc    Get all articles
 // @route   GET /api/articles
@@ -69,17 +71,29 @@ exports.updateArticle = async (req, res) => {
     
     // Build the article fields object with only the provided fields
     const articleFields = {};
-    if (title) articleFields.title = title;
-    if (body !== undefined) articleFields.body = body; // Allow empty body
-    if (icon) articleFields.icon = icon;
-    if (iconId !== undefined) articleFields.iconId = iconId; // Allow null
-    if (tags !== undefined) articleFields.tags = tags;  // Allow empty tags
+    if (title !== undefined) articleFields.title = title; // Allow empty title for now?
+    if (body !== undefined) articleFields.body = body; 
+    if (icon !== undefined) articleFields.icon = icon; // Allow setting icon
+    if (iconId !== undefined) articleFields.iconId = iconId; // Allow setting iconId
+    if (tags !== undefined) { 
+        // Ensure tags are stored as an array
+        if (Array.isArray(tags)) {
+            articleFields.tags = tags.map(tag => tag.trim()).filter(Boolean);
+        } else if (typeof tags === 'string') {
+            articleFields.tags = tags.split(',').map(tag => tag.trim()).filter(Boolean);
+        } else {
+             articleFields.tags = []; // Default to empty array if invalid type
+        }
+    }
     
+    // Ensure updatedAt is updated
+    articleFields.updatedAt = Date.now();
+
     // Update record
     const article = await Article.findByIdAndUpdate(
       req.params.id,
       { $set: articleFields },
-      { new: true } // Return the updated document
+      { new: true, runValidators: true } // Return the updated document and run schema validators
     );
     
     if (!article) {
@@ -88,11 +102,11 @@ exports.updateArticle = async (req, res) => {
     
     res.json(article);
   } catch (err) {
-    console.error(err.message);
+    console.error("Error updating article:", err.message);
     if (err.kind === 'ObjectId') {
       return res.status(404).json({ msg: 'Article not found' });
     }
-    res.status(500).send('Server Error');
+    res.status(500).json({ msg: 'Server Error', error: err.message }); // Send error message back
   }
 };
 
@@ -117,5 +131,71 @@ exports.deleteArticle = async (req, res) => {
       return res.status(404).json({ msg: 'Article not found' });
     }
     res.status(500).send('Server Error');
+  }
+};
+
+// @desc    Sync Article Icon to Linked Pins
+// @route   POST /api/articles/:id/sync-icon-to-pins
+// @access  Private // TODO: Add auth
+exports.syncArticleIconToPins = async (req, res) => {
+  const { icon, iconId } = req.body;
+  const articleId = req.params.id;
+
+  // Basic validation
+  if (!icon || !iconId) {
+      return res.status(400).json({ msg: 'Missing icon or iconId in request body' });
+  }
+  if (!mongoose.Types.ObjectId.isValid(articleId)) {
+       return res.status(400).json({ msg: 'Invalid Article ID format' });
+  }
+
+  try {
+    console.log(`Syncing icon for article ${articleId} to icon: ${icon}, iconId: ${iconId}`);
+    
+    // Find all maps that contain at least one pin linked to the target article
+    // This uses $elemMatch to efficiently find relevant maps
+    const mapsToUpdate = await Map.find({ 'pins.article': articleId });
+
+    let updatedPinCount = 0;
+    const updatePromises = [];
+
+    for (const map of mapsToUpdate) {
+      let mapModified = false;
+      map.pins.forEach(pin => {
+        // Check if the pin is linked to the target article
+        if (pin.article && pin.article.toString() === articleId) {
+          // Check if update is actually needed
+          if (pin.icon !== icon || pin.iconId !== iconId) {
+             pin.icon = icon;       // Update the pin's icon
+             pin.iconId = iconId;     // Update the pin's iconId
+             updatedPinCount++;
+             mapModified = true;
+          }
+        }
+      });
+
+      // If any pin in this map was modified, add its save operation to the promises array
+      if (mapModified) {
+        console.log(`Map ${map._id} modified, scheduling save.`);
+        updatePromises.push(map.save());
+      }
+    }
+
+    // Execute all save operations concurrently
+    if (updatePromises.length > 0) {
+        await Promise.all(updatePromises);
+        console.log(`Successfully synced icons for ${updatedPinCount} pins across ${updatePromises.length} maps.`);
+    }
+
+    res.json({ 
+        success: true, 
+        message: `Synced icon to ${updatedPinCount} pins.`,
+        updatedPinCount: updatedPinCount,
+        mapsAffected: updatePromises.length
+    });
+
+  } catch (err) {
+    console.error("Error syncing article icon to pins:", err.message);
+    res.status(500).json({ msg: 'Server Error during icon sync', error: err.message });
   }
 }; 

@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import tippy from 'tippy.js'; // Import tippy
 import { Menu, Item, useContextMenu } from 'react-contexify'; // Import context menu components
 import 'react-contexify/ReactContexify.css'; // Import context menu CSS
 import { Rnd } from 'react-rnd'; // Import Rnd
 import * as FaIcons from 'react-icons/fa'; // Import Font Awesome icons
+import { useQuery } from '@tanstack/react-query'; // Import useQuery
+import { FaSpinner } from 'react-icons/fa'; // Import spinner
 // tippy.css is already imported in main.jsx
 
 const PIN_MENU_ID = "pin-context-menu";
@@ -22,6 +24,16 @@ const PIN_SHAPES = {
   'chevron': 'M0,0 H20 V15 L10,20 L0,15 Z'
 };
 
+// API function to fetch a specific map
+const fetchMapDataById = async (mapId) => {
+  if (!mapId) return null;
+  const response = await fetch(`http://localhost:5001/api/maps/${mapId}`);
+  if (!response.ok) {
+    throw new Error(`HTTP error fetching map ${mapId}! status: ${response.status}`);
+  }
+  return response.json();
+};
+
 // Accept all required props including onShowEditModal
 const MapView = ({ 
   mapId, 
@@ -32,7 +44,7 @@ const MapView = ({
   onShowLinkModal,
   onShowEditModal 
 }) => {
-  const [mapData, setMapData] = useState(null);
+  // const [mapData, setMapData] = useState(null); // Replaced by useQuery
   const [imageLoaded, setImageLoaded] = useState(false); // State to track image load
   const [transformState, setTransformState] = useState({ scale: 1 }); // Track zoom level
   const mapImageRef = useRef(null);
@@ -45,28 +57,40 @@ const MapView = ({
   // Use hook for both menus
   const { show } = useContextMenu();
 
-  useEffect(() => {
-    if (!mapId) return;
+  // Fetch map data using React Query
+  const { data: mapData, isLoading, error } = useQuery({
+    queryKey: ['map', mapId], // Query key includes mapId
+    queryFn: () => fetchMapDataById(mapId), // Call the API function
+    enabled: !!mapId, // Only run the query if mapId is truthy
+    staleTime: 5 * 60 * 1000, // Optional: Keep data fresh for 5 minutes
+    // Add placeholderData or initialData if needed for smoother loading
+  });
 
-    const fetchMapData = async () => {
-      try {
-        const response = await fetch(`http://localhost:5001/api/maps/${mapId}`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        console.log("MapView received mapData:", data);
-        console.log("MapView setting image URL:", data.imageUrl);
-        setMapData(data);
-      } catch (e) {
-        console.error("Failed to fetch map data:", e);
-      }
-    };
-
-    fetchMapData();
-  }, [mapId]); // Refetch when mapId changes
-
-  if (!mapData) return <p>Select a map to view.</p>; // Handle initial load / no data
+  // Handle loading and error states
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+        <FaSpinner className="spinner" size={32} /> {/* Use Spinner */}
+        <span style={{ marginLeft: '15px' }}>Loading map data...</span>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div style={{ padding: '20px', color: 'red' }}>
+        <p>Error loading map:</p>
+        <p>{error.message}</p>
+      </div>
+    );
+  }
+  // If mapId is null/undefined and query is disabled, show default message
+  if (!mapData) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+        <p>Select a map to view.</p>
+      </div>
+    );
+  } 
 
   // Updated container style for full height and background pattern
   const containerStyle = {
@@ -352,7 +376,7 @@ const MapView = ({
                         target.style.left = `${unscaledCursorX}px`;
                         target.style.top = `${unscaledCursorY}px`;
                         // Ensure transform origin is correct for visual alignment
-                        // We keep the translate(-50%, -100%) from the style prop, so origin isn't strictly needed here
+                        // We keep the translate(-50%, -100%) from the style prop transform, so origin isn't strictly needed here
                         // target.style.transformOrigin = 'center bottom'; // This might conflict with style prop transform
                       }
                     };

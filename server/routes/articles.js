@@ -17,4 +17,7 @@ router.put('/:id', articleController.updateArticle);
 // Delete an article by ID
 router.delete('/:id', articleController.deleteArticle);
 
+// Sync article icon to linked pins
+router.post('/:id/sync-icon-to-pins', articleController.syncArticleIconToPins);
+
 module.exports = router; 

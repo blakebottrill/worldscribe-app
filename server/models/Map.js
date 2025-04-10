@@ -16,6 +16,10 @@ const PinSchema = new Schema({
     // required: true, // REMOVED - Link is now optional
   },
   // Pin customization fields
+  icon: {
+    type: String,
+    default: null, // Default to null, potentially derive from article if not set?
+  },
   iconId: {
     type: String,
     default: null, // Shared icon identifier

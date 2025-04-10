@@ -99,15 +99,19 @@ const PinEditModal = ({
   };
 
   const handleSave = () => {
-    const updatedPin = {
-      ...pin,
+    const updatedPinData = {
       icon: selectedIcon,
       iconId: iconId,
       shape: selectedShape,
       color: selectedColor,
       displayType: displayType
     };
-    onSave(updatedPin);
+    // Call onSave with the expected structure
+    onSave({ 
+      pin: pin, // Pass the original pin object under the 'pin' key
+      linkedArticle: linkedArticle, // Pass the linked article
+      ...updatedPinData // Spread the updated fields
+    });
   };
 
   const handleIconSelect = (iconName) => {

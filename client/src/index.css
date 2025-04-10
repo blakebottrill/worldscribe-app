@@ -243,3 +243,8 @@ span[data-mention-id]:hover {
 .spin-icon {
   animation: spin 1s linear infinite;
 }
+
+/* General Loading Spinner */
+.spinner {
+  animation: spin 1.5s linear infinite; /* Reuse spin animation */
+}

@@ -1,13 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import ArticleLinkModal from '../common/ArticleLinkModal';
+import React, { useState } from 'react';
+// Remove ArticleLinkModal import if not used directly in form submission logic
+// import ArticleLinkModal from '../common/ArticleLinkModal';
+import { FaSpinner } from 'react-icons/fa'; // For loading state
 
-const TimelineEventForm = ({ initialData = null, onSubmitSuccess, onCancel, articles, onShowLinkModal }) => {
+// Updated props: onSubmit, isSubmitting, submitError
+const TimelineEventForm = ({ 
+    initialData = null, 
+    onSubmit, // Renamed from onSubmitSuccess
+    onCancel, 
+    articles, // Still needed for display?
+    onShowLinkModal, 
+    isSubmitting, // Passed down from page mutation
+    submitError // Passed down from page mutation
+}) => {
   const [eventName, setEventName] = useState('');
   const [dateString, setDateString] = useState('');
   const [description, setDescription] = useState('');
-  const [linkedArticle, setLinkedArticle] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState(null);
+  const [linkedArticle, setLinkedArticle] = useState(null); // Local state for selection
+  // const [isSubmitting, setIsSubmitting] = useState(false); // Removed, use prop
+  const [error, setError] = useState(null); // Local form validation error
 
   const isEditing = initialData !== null;
 
@@ -16,62 +27,48 @@ const TimelineEventForm = ({ initialData = null, onSubmitSuccess, onCancel, arti
       setEventName(initialData.eventName || '');
       setDateString(initialData.dateString || '');
       setDescription(initialData.description || '');
-      setLinkedArticle(initialData.article || null);
+      // Find the full article object from the articles list prop if available
+      // This assumes initialData.article might just be an ID
+      const initialArticle = articles?.find(a => a._id === initialData.article) || initialData.article; // Fallback if already populated
+      setLinkedArticle(initialArticle || null);
     } else {
+      // Reset fields for add mode
       setEventName('');
       setDateString('');
       setDescription('');
       setLinkedArticle(null);
     }
-  }, [initialData, isEditing]);
+  }, [initialData, isEditing, articles]);
 
-  const handleSubmit = async (event) => {
+  // handleSubmit now calls the passed onSubmit prop (the mutation trigger)
+  const handleSubmit = (event) => {
     event.preventDefault();
     if (!eventName || !dateString) {
       setError('Event Name and Date are required.');
       return;
     }
+    setError(null); // Clear local validation error
 
-    setIsSubmitting(true);
-    setError(null);
-
+    // Prepare data, including _id if editing
     const eventData = { 
+        ...(isEditing && { _id: initialData._id }), // Include _id only if editing
         eventName, 
         dateString, 
         description, 
-        articleId: linkedArticle?._id || null 
+        articleId: linkedArticle?._id || null // Send only the ID
     };
-    const url = isEditing 
-      ? `http://localhost:5001/api/timeline/${initialData._id}` 
-      : 'http://localhost:5001/api/timeline';
-    const method = isEditing ? 'PUT' : 'POST';
-
-    try {
-      const response = await fetch(url, {
-        method: method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(eventData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ msg: `Failed to ${isEditing ? 'update' : 'add'} event` }));
-        throw new Error(errorData.msg || `HTTP error! status: ${response.status}`);
-      }
-
-      onSubmitSuccess();
-
-    } catch (e) {
-      console.error(`Failed to ${isEditing ? 'update' : 'add'} event:`, e);
-      setError(`Failed to ${isEditing ? 'update' : 'add'} event: ${e.message}`);
-    } finally {
-      setIsSubmitting(false);
-    }
+    
+    onSubmit(eventData); // Call the mutation function passed via props
   };
+
+  // Local error display combines local validation and mutation error
+  const displayError = error || submitError?.message;
 
   return (
     <div style={{ border: '1px solid #ccc', padding: '20px', margin: '20px 0' }}>
       <h3>{isEditing ? 'Edit Timeline Event' : 'Add New Timeline Event'}</h3>
       <form onSubmit={handleSubmit}>
+        {/* Input Fields (disabled={isSubmitting}) */}
         <div style={{ marginBottom: '10px' }}>
           <label>Event Name:*</label>
           <input type="text" value={eventName} onChange={(e) => setEventName(e.target.value)} required disabled={isSubmitting} style={{ width: '100%', boxSizing: 'border-box' }} />
@@ -87,15 +84,20 @@ const TimelineEventForm = ({ initialData = null, onSubmitSuccess, onCancel, arti
         <div style={{ marginBottom: '10px' }}>
           <label>Linked Article:</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '5px' }}>
-            <span>{linkedArticle ? linkedArticle.title : 'None'}</span>
+            {/* Display linked article title */}
+            <span>{linkedArticle ? linkedArticle.title : 'None'}</span> 
             <button type="button" onClick={() => onShowLinkModal(linkedArticle?._id, setLinkedArticle)} disabled={isSubmitting}>
               {linkedArticle ? 'Change Link' : 'Link Article'}
             </button>
           </div>
         </div>
-        {error && <p style={{ color: 'red' }}>{error}</p>}
+        
+        {/* Display combined error message */}
+        {displayError && <p style={{ color: 'red' }}>{displayError}</p>}
+        
         <button type="submit" disabled={isSubmitting} style={{ marginRight: '10px' }}>
-          {isSubmitting ? (isEditing ? 'Updating...' : 'Adding...') : (isEditing ? 'Update Event' : 'Add Event')}
+          {/* Show spinner when submitting */}
+          {isSubmitting ? <FaSpinner className="spinner" size={14}/> : (isEditing ? 'Update Event' : 'Add Event')}
         </button>
         <button type="button" onClick={onCancel} disabled={isSubmitting}>
           Cancel

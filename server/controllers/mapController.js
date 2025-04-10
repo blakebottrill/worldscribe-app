@@ -2,6 +2,7 @@ const Map = require('../models/Map');
 const Article = require('../models/Article'); // Needed for pin validation
 const fs = require('fs');
 const path = require('path');
+const mongoose = require('mongoose');
 
 // Placeholder functions - implement logic later
 
@@ -83,56 +84,59 @@ exports.createMap = async (req, res) => {
   }
 };
 
-// Update map pins
+// Update map pins - This seems to be for CREATING new pins based on frontend usage
 exports.updateMapPins = async (req, res) => {
-  // Expect articleId instead of articleTitle, plus optional customization properties
   const { x, y, articleId, icon, iconId, shape, color, displayType } = req.body;
   const mapId = req.params.id;
 
-  // Basic validation
-  if (typeof x !== 'number' || typeof y !== 'number' || articleId === undefined) { // articleId can be null, but must be present
-    return res.status(400).json({ msg: 'Invalid pin data provided (requires x, y, articleId).' });
+  if (typeof x !== 'number' || typeof y !== 'number') {
+    return res.status(400).json({ msg: 'Invalid pin coordinates provided.' });
   }
+  // articleId can be null/undefined
 
   try {
-    // 2. Find the Map
     const map = await Map.findById(mapId);
     if (!map) {
       return res.status(404).json({ msg: 'Map not found' });
     }
 
-    // TODO: Check user ownership of the map
+    // Validate Article ID if provided
+    if (articleId) {
+        if (!mongoose.Types.ObjectId.isValid(articleId)) {
+             return res.status(400).json({ msg: 'Invalid Article ID format' });
+        }
+        const articleExists = await Article.findById(articleId).select('_id');
+        if (!articleExists) {
+             return res.status(404).json({ msg: `Article with ID ${articleId} not found` });
+        }
+    }
 
-    // 3. Create the new pin object with customization options
+    // Create the new pin object
     const newPin = {
       x: x,
       y: y,
-      article: articleId || null, // Use passed ID or null
-      icon: icon || null,      // Legacy field
-      iconId: iconId || null,  // New shared icon identifier
-      shape: shape || 'pin', // Default to pin shape
-      color: color || '#dc3545', // Default red color
-      displayType: displayType || 'pin+icon' // Default to showing both
+      article: articleId || null,
+      icon: icon || null,      // Use provided icon or null
+      iconId: iconId || null,  // Use provided iconId or null
+      shape: shape || 'pin',
+      color: color || '#dc3545',
+      displayType: displayType || 'pin+icon'
     };
 
-    // 4. Add the pin to the map's pins array
     map.pins.push(newPin);
-
-    // 5. Save the updated map
     await map.save();
 
-    // 6. Fetch the updated map with populated pins for the response
-    const updatedMap = await Map.findById(mapId).populate({
-      path: 'pins.article',
-      select: 'title icon iconId' // Include iconId in populated data
-    });
+    // Find the newly added pin in the saved map (Mongoose adds _id)
+    // The newly added pin will be the last one in the array
+    const createdPin = map.pins[map.pins.length - 1];
 
-    res.json(updatedMap); // Return the whole updated map
+    // Respond with the newly created pin data (including its generated _id)
+    res.status(201).json(createdPin);
 
   } catch (err) {
-    console.error(`Error updating pins for map ${mapId}:`, err);
+    console.error(`Error creating pin for map ${mapId}:`, err);
     if (err.kind === 'ObjectId') {
-      return res.status(404).json({ msg: 'Map or Article not found' });
+      return res.status(404).json({ msg: 'Map not found' });
     }
     res.status(500).send('Server Error');
   }
@@ -215,13 +219,20 @@ exports.deleteMapPin = async (req, res) => {
 // Update a specific pin
 exports.updateMapPin = async (req, res) => {
   const { mapId, pinId } = req.params;
-  // Expanded to include all pin customization properties and iconId
   const { articleId, x, y, icon, iconId, shape, color, displayType } = req.body;
 
-  // Basic check: at least one updatable field must be present
-  if (articleId === undefined && x === undefined && y === undefined && 
-      icon === undefined && iconId === undefined && shape === undefined && 
-      color === undefined && displayType === undefined) {
+  // Check if any valid update data is present
+  const updateFields = {};
+  if (articleId !== undefined) updateFields.article = articleId; // Allow null
+  if (x !== undefined) updateFields.x = x;
+  if (y !== undefined) updateFields.y = y;
+  if (icon !== undefined) updateFields.icon = icon; // Allow null
+  if (iconId !== undefined) updateFields.iconId = iconId; // Allow null
+  if (shape !== undefined) updateFields.shape = shape;
+  if (color !== undefined) updateFields.color = color;
+  if (displayType !== undefined) updateFields.displayType = displayType;
+
+  if (Object.keys(updateFields).length === 0) {
       return res.status(400).json({ msg: 'No update data provided for pin.' });
   }
 
@@ -231,54 +242,46 @@ exports.updateMapPin = async (req, res) => {
       return res.status(404).json({ msg: 'Map not found' });
     }
 
-    // TODO: Check user ownership
-
-    // Find the pin within the map's pins array
     const pin = map.pins.id(pinId);
     if (!pin) {
       return res.status(404).json({ msg: 'Pin not found on this map' });
     }
 
-    // Update Article Link (if articleId is provided)
-    if (articleId !== undefined) {
-      // No need to look up - just assign the ID (can be null)
-      pin.article = articleId; // Update the pin's article field
+    // Validate Article ID if it's being updated (and not set to null)
+    if (updateFields.article) {
+        if (!mongoose.Types.ObjectId.isValid(updateFields.article)) {
+             return res.status(400).json({ msg: 'Invalid Article ID format' });
+        }
+        const articleExists = await Article.findById(updateFields.article).select('_id');
+        if (!articleExists) {
+             return res.status(404).json({ msg: `Article with ID ${updateFields.article} not found` });
+        }
     }
 
-    // Update Coordinates (if x and y are provided)
-    if (x !== undefined) pin.x = x;
-    if (y !== undefined) pin.y = y;
-    
-    // Handle icon updates - legacy field
-    if (icon !== undefined) {
-      pin.icon = icon;
-    }
-    
-    // Handle iconId updates - new central identifier
-    if (iconId !== undefined) {
-      pin.iconId = iconId;
-    }
+    // Apply updates to the pin subdocument
+    Object.assign(pin, updateFields);
 
-    // Update other customization fields
-    if (shape !== undefined) pin.shape = shape;
-    if (color !== undefined) pin.color = color;
-    if (displayType !== undefined) pin.displayType = displayType;
-
-    // Save the updated map
+    // Save the parent Map document
     await map.save();
 
-    // Populate the pin's article data before sending response
-    await Map.populate(map, {
-      path: 'pins.article',
-      select: 'title icon iconId'
-    });
+    // Populate the article details for the updated pin before sending response
+    // We need to find the map again or populate manually
+    const updatedPin = map.pins.id(pinId); // Get the updated pin again
+    let populatedPin = updatedPin.toObject(); // Convert to plain object
+    if (populatedPin.article) {
+        const articleDetails = await Article.findById(populatedPin.article).select('title icon iconId');
+        populatedPin.article = articleDetails; // Replace ID with populated object
+    }
 
-    res.json(pin); // Return just the updated pin with populated article
+    res.json(populatedPin); // Return the updated pin data (populated)
 
   } catch (err) {
     console.error(`Error updating pin ${pinId} on map ${mapId}:`, err);
     if (err.kind === 'ObjectId') {
       return res.status(404).json({ msg: 'Map or Pin not found' });
+    }
+     if (err.name === 'ValidationError') {
+        return res.status(400).json({ msg: 'Validation Error', errors: err.errors });
     }
     res.status(500).send('Server Error');
   }

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import MarkdownEditor from './MarkdownEditor'; // Assuming this holds Tiptap
 import IconPicker from '../common/IconPicker'; // Import IconPicker
 import * as FaIcons from 'react-icons/fa'; // Import all FaIcons
+import { FaSpinner } from 'react-icons/fa'; // Keep spinner for potential future use
 import './ArticleEditor.css'; // Add for specific editor styles
-// import { FaSpinner } from 'react-icons/fa'; // No longer needed
 
 // Helper to get icon component from name, defaulting to FaBook
 const getIconComponent = (iconName) => {
@@ -11,45 +11,38 @@ const getIconComponent = (iconName) => {
 };
 
 // Accept articles and onShowMentionLinkModal and onDelete, and new onTitleChangeRealtime and onMentionClick
-const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionLinkModal, onDelete, onTitleChangeRealtime, onMentionClick }) => {
+const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionLinkModal, onDelete, onTitleChangeRealtime, onMentionClick, isSaving }) => {
   const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
+  const [body, setBody] = useState(''); // Add state for body content
   const [tagList, setTagList] = useState([]); // New state for tags array
   const [tagInput, setTagInput] = useState(''); // New state for tag input field
   const [icon, setIcon] = useState('FaBook'); // Add state for icon name
   const [showIconPicker, setShowIconPicker] = useState(false); // State for modal
-  const editorRef = useRef(null); // Ref to access editor instance if needed elsewhere
-  // Track if initial data has been loaded
-  const initialDataLoadedRef = useRef(false);
-  // Track if we're in the middle of a save operation
-  const isSavingRef = useRef(false);
   const debounceTimerRef = useRef(null);
-  // Ref to store the data intended for the next debounced save
-  const pendingSaveDataRef = useRef(null);
+  const editorRef = useRef(null); // Define editorRef
+  const initialDataLoadedRef = useRef(false); // Define initialDataLoadedRef
+  const pendingSaveDataRef = useRef(null); // Define pendingSaveDataRef
 
   // Handle initialData changes (e.g., when navigating between articles)
   useEffect(() => {
     if (initialData) {
       setTitle(initialData.title || '');
-      setBody(initialData.body || '');
-      
-      // Parse tags from comma-separated string
+      setBody(initialData.body || ''); // Initialize body state
       const parsedTags = initialData.tags 
         ? initialData.tags.split(',').map(tag => tag.trim()).filter(Boolean) 
         : [];
       setTagList(parsedTags);
-      
       setTagInput('');
       setIcon(initialData.icon || 'FaBook');
-      initialDataLoadedRef.current = true;
+      initialDataLoadedRef.current = true; // Set flag to true after loading
     } else {
       // Reset fields if initialData becomes null
       setTitle('');
-      setBody('');
+      setBody(''); // Reset body state
       setTagList([]);
       setTagInput('');
       setIcon('FaBook');
-      initialDataLoadedRef.current = false;
+      initialDataLoadedRef.current = false; // Reset flag
     }
   }, [initialData]);
 
@@ -74,7 +67,7 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
 
   // Body change handler with debounced save
   const handleBodyChange = useCallback((newBody) => {
-    setBody(newBody);
+    setBody(newBody); // This setter is now defined
     // Pass the complete intended state to debouncedSave
     debouncedSave({ 
       title: title, 
@@ -82,85 +75,18 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
       tags: tagList.join(','), 
       icon: icon 
     });
-  }, [title, tagList, icon]);
+  }, [title, tagList, icon]); // Dependencies seem correct as setBody is stable
 
-  // Icon change handler with immediate save and pin syncing
-  const handleIconSelect = async (iconName) => {
+  // Icon change handler - only updates local state and triggers save via prop
+  const handleIconSelect = (iconName) => {
     setIcon(iconName);
     setShowIconPicker(false);
     
-    // Generate a unique iconId if this is a new selection
+    // Don't save immediately here. Instead, trigger the main save function.
+    // The icon sync logic is now handled in WikiPage after the save succeeds.
+    // Ensure iconId is included for the save
     const iconId = initialData?.iconId || `icon_${Date.now()}`;
-    
-    // Update the article with the new icon and iconId
-    const updatedArticle = {
-      ...initialData,
-      icon: iconName,
-      iconId: iconId // Store the iconId for sharing between pins and articles
-    };
-    
-    try {
-      // Save the article first
-      if (onSave) {
-        await onSave(updatedArticle);
-        console.log("Article saved with new icon:", iconName, "and iconId:", iconId);
-      }
-      
-      // Sync iconId to ALL related pins
-      if (initialData && initialData._id) {
-        const articleId = initialData._id;
-        
-        const mapsResponse = await fetch('http://localhost:5001/api/maps');
-        if (!mapsResponse.ok) throw new Error('Failed to fetch maps for icon sync');
-        const mapsData = await mapsResponse.json();
-        
-        let syncedPins = 0;
-        // Ensure mapsData is an array before iterating
-        if (Array.isArray(mapsData)) { 
-          for (const map of mapsData) {
-            // Ensure map.pins is an array before filtering
-            console.log(`Checking map ${map?._id}. Pins data:`, map?.pins);
-            if (map && Array.isArray(map.pins)) {
-              // Find all pins linked to this article
-              const relatedPins = map.pins.filter(pin => 
-                pin.article && 
-                pin.article._id === articleId
-              );
-              
-              // If any pins need updating, update them
-              if (relatedPins.length > 0) {
-                for (const pin of relatedPins) {
-                  // Send the shared iconId and icon to all related pins
-                  const response = await fetch(`http://localhost:5001/api/maps/${map._id}/pins/${pin._id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                      iconId: iconId,
-                      icon: iconName
-                    }),
-                  });
-                  
-                  if (!response.ok) {
-                    console.error(`Failed to sync icon to pin ${pin._id} on map ${map._id}`);
-                  } else {
-                    syncedPins++;
-                    console.log(`Successfully synced icon ${iconName} with iconId ${iconId} to pin ${pin._id}`);
-                  }
-                }
-              }
-            } else {
-              console.warn(`Map ${map?._id || 'unknown'} is missing or has an invalid pins array, skipping for icon sync.`);
-            }
-          }
-        } else {
-           console.warn("Received non-array data from /api/maps, skipping icon sync.");
-        }
-        
-        console.log(`Icon sync complete: updated ${syncedPins} pins with icon ${iconName} and iconId ${iconId}`);
-      }
-    } catch (error) {
-      console.error("Error updating article icon or syncing to pins:", error);
-    }
+    saveArticle({ icon: iconName, iconId: iconId }, false); // Trigger immediate save for icon change
   };
 
   // Handle tag input key events (Enter to add tag)
@@ -173,8 +99,8 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
         if (newTags.length > 0) {
           const updatedTagList = [...tagList, ...newTags];
           setTagList(updatedTagList);
-          // Immediate save - Pass only the changed field
-          saveArticle({ tags: updatedTagList.join(',') });
+          // Trigger immediate save with only changed field
+          saveArticle({ tags: updatedTagList.join(',') }, false);
         }
       }
       setTagInput('');
@@ -185,8 +111,8 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
   const handleRemoveTag = (indexToRemove) => {
     const updatedTagList = tagList.filter((_, index) => index !== indexToRemove);
     setTagList(updatedTagList);
-    // Immediate save - Pass only the changed field
-    saveArticle({ tags: updatedTagList.length ? updatedTagList.join(',') : '' });
+    // Trigger immediate save with only changed field
+    saveArticle({ tags: updatedTagList.length ? updatedTagList.join(',') : '' }, false);
   };
 
   // Delete article handler
@@ -198,7 +124,7 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
 
   // Debounced save function (for content that changes frequently like title and body)
   const debouncedSave = (intendedData) => {
-    if (!initialDataLoadedRef.current) return;
+    if (!initialDataLoadedRef.current || isSaving) return;
     
     // Store the latest intended data
     pendingSaveDataRef.current = intendedData;
@@ -211,7 +137,7 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
     // Set a new timer
     debounceTimerRef.current = setTimeout(() => {
       // When timer expires, save the data that was last pending
-      if (pendingSaveDataRef.current) {
+      if (pendingSaveDataRef.current && !isSaving) {
         // Pass the *full* pending data to saveArticle
         saveArticle(pendingSaveDataRef.current, true); // Pass flag indicating it's a debounced save
         pendingSaveDataRef.current = null; // Clear pending data after scheduling save
@@ -222,42 +148,30 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
   // Function to save article
   // Takes either partial data (for immediate saves) or full data (for debounced saves)
   const saveArticle = (dataToSave, isDebounced = false) => {
-    if (!initialDataLoadedRef.current || isSavingRef.current) return;
+    if (isSaving || (!initialDataLoadedRef.current && !initialData?._id?.startsWith('temp-'))) return;
     
-    isSavingRef.current = true;
-    
-    // Construct the final data object
+    // Construct the final data object to send via onSave
+    // Start with current full state as baseline
     const finalArticleData = {
       _id: initialData?._id,
-      // Start with current state as baseline only if it's an immediate save
-      title: isDebounced ? dataToSave.title : title,
-      body: isDebounced ? dataToSave.body : body,
-      tags: isDebounced ? dataToSave.tags : (tagList.length ? tagList.join(',') : ''),
-      icon: isDebounced ? dataToSave.icon : icon,
+      title: title,
+      body: body,
+      tags: tagList.join(','), // Always send current tag list as string
+      icon: icon,
+      iconId: initialData?.iconId // Preserve existing iconId unless changed by handleIconSelect
     };
 
-    // If it's an immediate save, merge the specific changed field(s)
-    if (!isDebounced) {
-      if (dataToSave.title !== undefined) finalArticleData.title = dataToSave.title;
-      if (dataToSave.body !== undefined) finalArticleData.body = dataToSave.body;
-      if (dataToSave.tags !== undefined) finalArticleData.tags = dataToSave.tags;
-      if (dataToSave.icon !== undefined) finalArticleData.icon = dataToSave.icon;
-    }
+    // Merge the specific changes from dataToSave (could be partial for immediate saves)
+    Object.assign(finalArticleData, dataToSave);
 
-    // Ensure tags is always a string before saving
+    // Ensure tags is always a string, even if empty
     finalArticleData.tags = finalArticleData.tags || '';
 
-    console.log("Saving article with data (isDebounced:", isDebounced, "):", finalArticleData);
-    
-    onSave(finalArticleData)
-      .then(() => {
-        console.log("Article saved successfully");
-        isSavingRef.current = false;
-      })
-      .catch(error => {
-        console.error("Failed to save article:", error);
-        isSavingRef.current = false;
-      });
+    console.log(`Calling onSave (isDebounced: ${isDebounced}) with:`, finalArticleData);
+    if (onSave) {
+        // Call the actual mutation trigger passed down via props
+        onSave(finalArticleData);
+    }
   };
 
   // Clean up debounce timer on unmount
@@ -271,6 +185,9 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
 
   const CurrentIcon = getIconComponent(icon); // Get current icon component
 
+  // Prevent editing title/tags while saving?
+  const controlsDisabled = isSaving;
+
   return (
     <div className="article-editor-container" style={{ padding: '1rem', position: 'relative' }}>
       {/* Title and Icon Input Area */}
@@ -278,6 +195,7 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
         <button 
           className="icon-select-button" 
           onClick={() => setShowIconPicker(true)}
+          disabled={controlsDisabled}
           title="Change Icon"
         >
           <CurrentIcon size="1.5em" /> {/* Display current icon */} 
@@ -289,6 +207,7 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
           value={title}
           onChange={handleTitleChange}
           required
+          disabled={controlsDisabled}
         />
       </div>
 
@@ -313,6 +232,7 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
           onChange={(e) => setTagInput(e.target.value)}
           onKeyDown={handleTagKeyDown}
           style={{ width: 'calc(100% - 60px)', fontSize: '0.9em', marginBottom: '5px' }}
+          disabled={controlsDisabled}
         />
         <div className="tags-container"> {/* Container for displaying tags */}
           {tagList.map((tag, index) => (
@@ -323,6 +243,7 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
                 className="remove-tag-button" 
                 onClick={() => handleRemoveTag(index)}
                 title={`Remove ${tag}`}
+                disabled={controlsDisabled}
               >
                 &times;
               </button>
@@ -337,7 +258,7 @@ const ArticleEditor = ({ initialData, onSave, onCancel, articles, onShowMentionL
         {/* <button onClick={onCancel} style={{ marginRight: '10px' }}>Cancel</button> */}
         {/* Delete button remains */}
         {initialData?._id && (
-          <button onClick={handleDelete} className="delete-button">Delete</button>
+          <button onClick={handleDelete} className="delete-button" disabled={controlsDisabled || !initialData?._id}>Delete</button>
         )}
       </div>
 
