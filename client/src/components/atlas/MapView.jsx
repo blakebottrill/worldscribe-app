@@ -34,13 +34,13 @@ const MapView = ({
 }) => {
   const [mapData, setMapData] = useState(null);
   const [imageLoaded, setImageLoaded] = useState(false); // State to track image load
+  const [transformState, setTransformState] = useState({ scale: 1 }); // Track zoom level
   const mapImageRef = useRef(null);
-  // Store transform state
-  const [transformState, setTransformState] = useState({
-    scale: 1,
-    positionX: 0,
-    positionY: 0
-  });
+  const mapContainerRef = useRef(null);
+  // Add refs to manage drag state
+  const dragStartPos = useRef({ x: 0, y: 0 });
+  const isDraggingRef = useRef(false);
+  const dragThreshold = 5; // Pixels threshold to initiate drag
 
   // Use hook for both menus
   const { show } = useContextMenu();
@@ -68,13 +68,17 @@ const MapView = ({
 
   if (!mapData) return <p>Select a map to view.</p>; // Handle initial load / no data
 
+  // Updated container style for full height and background pattern
   const containerStyle = {
-    width: '100%', 
-    // Limited height for example, adjust as needed for layout
-    height: 'calc(100vh - 250px)', 
+    width: '100%',
+    height: '100%',
     border: '1px solid #ccc',
-    overflow: 'hidden', // Handled by TransformWrapper
-    position: 'relative' // Needed for absolute positioning of pins
+    overflow: 'hidden',
+    position: 'relative',
+    // Graph paper background
+    backgroundColor: '#fdfdfd', // White background
+    backgroundImage: 'linear-gradient(to right, #eee 1px, transparent 1px), linear-gradient(to bottom, #eee 1px, transparent 1px)',
+    backgroundSize: '20px 20px', // Size of the grid squares
   };
 
   // Base pin size in pixels (adjusting for SVG viewbox)
@@ -111,17 +115,23 @@ const MapView = ({
         show({ event, id: PIN_MENU_ID, props: { pin } });
       }
     } else if (mapImageRef.current?.contains(event.target)) { // Clicked on map area
-       const rect = mapImageRef.current.getBoundingClientRect();
-       
-       // Use the same reliable approach as in handleDragStop
-       // Calculate relative position within the container
-       const x = (event.clientX - rect.left) / rect.width;
-       const y = (event.clientY - rect.top) / rect.height;
-       
-       const clampedX = Math.max(0, Math.min(1, x));
-       const clampedY = Math.max(0, Math.min(1, y));
-       
-       show({ event, id: MAP_MENU_ID, props: { coords: { x: clampedX, y: clampedY } } });
+      // Direct use of mouseCoordinates instead of context menu
+      const rect = mapImageRef.current.getBoundingClientRect();
+      const { scale } = transformState;
+      
+      // Calculate position relative to the image, accounting for zoom
+      const mouseX = (event.clientX - rect.left) / scale;
+      const mouseY = (event.clientY - rect.top) / scale;
+      
+      // Convert to percentage
+      const xPercent = mouseX / (rect.width / scale);
+      const yPercent = mouseY / (rect.height / scale);
+      
+      // Ensure coordinates are within bounds
+      const clampedX = Math.max(0, Math.min(1, xPercent));
+      const clampedY = Math.max(0, Math.min(1, yPercent));
+      
+      show({ event, id: MAP_MENU_ID, props: { coords: { x: clampedX, y: clampedY } } });
     }
   }
 
@@ -142,9 +152,9 @@ const MapView = ({
       case "remove":
         if (pin) onDeletePin(pin._id);
         break;
-      // Map Menu Actions
+      // Map Context Menu Actions
       case "add_pin":
-        // Call new handler to open link modal for coordinates
+        // Call link modal with the pre-calculated coordinates
         if (coords) onShowLinkModal({ coords });
         break;
       default:
@@ -152,35 +162,6 @@ const MapView = ({
     }
   };
 
-  // Updated handler for when dragging stops with Rnd
-  const handleDragStop = (e, d, pinId) => {
-    if (!mapImageRef.current) return;
-
-    const rect = mapImageRef.current.getBoundingClientRect();
-    
-    // Get the current scale, defaulting to 1 if not set
-    const scale = transformState.scale || 1;
-    
-    // Simplify the calculation - just use the basic ratio of position to container size
-    // This works regardless of zoom level because Rnd handles the scaling internally
-    // when we pass the scale prop to it
-    const xPercent = d.x / rect.width;
-    const yPercent = d.y / rect.height;
-    
-    // Ensure we have valid numbers before updating
-    if (isNaN(xPercent) || isNaN(yPercent)) {
-      console.error("Invalid coordinates calculated:", { x: xPercent, y: yPercent, scale });
-      return; // Don't update if we have invalid numbers
-    }
-    
-    // Clamp values to [0,1] range
-    const clampedX = Math.max(0, Math.min(1, xPercent));
-    const clampedY = Math.max(0, Math.min(1, yPercent));
-
-    console.log(`Pin ${pinId} dragged to: x=${clampedX}, y=${clampedY} (scale: ${scale})`);
-    onUpdatePinPosition(pinId, { x: clampedX, y: clampedY });
-  };
-  
   // Render a pin with customized styling using SVG
   const renderPin = (pin) => {
     const displayType = pin.displayType || 'pin+icon';
@@ -251,103 +232,206 @@ const MapView = ({
   };
 
   return (
-    <div style={containerStyle}>
-      <TransformWrapper
-        initialScale={1}
-        initialPositionX={0}
-        initialPositionY={0}
-        onInit={(state) => {
-          // Ensure transform state is initialized at component mount
-          setTransformState({
-            scale: state.instance.transformState.scale,
-            positionX: state.instance.transformState.positionX,
-            positionY: state.instance.transformState.positionY
-          });
-        }}
-        onTransformed={(state) => {
-          // Store current transformation state for pin positioning calculations
-          setTransformState({
-            scale: state.scale,
-            positionX: state.positionX,
-            positionY: state.positionY
-          });
-        }}
+    <div style={containerStyle} ref={mapContainerRef}>
+      <TransformWrapper 
+        onTransformed={(ref) => setTransformState(ref.state)}
+        limitToBounds={false}
+        // Disable panning when dragging a pin
+        panning={{ disabled: isDraggingRef.current }}
+        // Disable zooming when dragging a pin (optional but good practice)
+        // wheel={{ disabled: isDraggingRef.current }}
       >
-        <TransformComponent>
+        <TransformComponent 
+          wrapperStyle={{ width: '100%', height: '100%' }}
+          contentStyle={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+        >
           <div 
             ref={mapImageRef}
-            style={{ position: 'relative', lineHeight: 0, cursor: pinsLocked ? 'grab' : 'default' }}
+            style={{ 
+              position: 'relative', 
+              lineHeight: 0, 
+              cursor: pinsLocked ? 'grab' : 'default',
+              width: '100%',
+              height: 'auto',
+              display: 'flex',
+              justifyContent: 'center'
+            }}
             onContextMenu={handleContextMenu}
           >
             <img 
               src={fullImageUrl} 
               alt={mapData.title} 
-              style={{ maxWidth: '100%', display: 'block' }} 
+              style={{ 
+                width: '100%', 
+                height: 'auto', 
+                objectFit: 'contain', 
+                display: 'block'
+              }} 
               onLoad={() => setImageLoaded(true)} // Trigger re-render when image loads
             />
             
             {/* Only render pins if image is loaded and dimensions are likely available */}
             {imageLoaded && mapData.pins && mapData.pins.map((pin, index) => {
-              if (!pin.x || !pin.y) {
-                console.warn(`Pin ${pin._id || index} has invalid coordinates:`, pin);
-                return null; // Skip rendering pins with invalid coordinates
-              }
-              
-              // Calculate absolute position in pixels
-              const initialX = pin.x * mapImageRef.current.offsetWidth;
-              const initialY = pin.y * mapImageRef.current.offsetHeight;
+              // Calculate initial position based on stored percentages
+              const initialLeft = pin.x * 100;
+              const initialTop = pin.y * 100;
 
               return (
-                <Rnd
+                <div
                   key={pin._id || index}
-                  size={{ width: pinWidth, height: pinHeight }}
-                  position={{ x: initialX, y: initialY }}
-                  scale={transformState.scale}
-                  onDragStart={(e) => e.stopPropagation()} // Stop propagation on drag start
-                  onDragStop={(e, d) => handleDragStop(e, d, pin._id)}
-                  disableDragging={pinsLocked}
-                  enableResizing={false}
-                  bounds="parent"
-                  style={{ zIndex: 5 }}
-                >
-                  {/* The visible pin element, handles interactions */}
-                  <div 
-                    ref={node => {
-                      if (node) {
-                        // Destroy existing instance if node re-renders/changes
-                        if (node._tippy) {
-                          node._tippy.destroy();
-                        }
-                        // Create new instance
+                  className="pin-wrapper"
+                  style={{
+                    position: 'absolute',
+                    left: `${initialLeft}%`,
+                    top: `${initialTop}%`,
+                    width: `${pinWidth}px`,
+                    height: `${pinHeight}px`,
+                    transform: 'translate(-50%, -100%)', // Center horizontally, align bottom with position
+                    cursor: pinsLocked ? 'pointer' : 'grab', // Use grab cursor for unlocked pins
+                    zIndex: 5,
+                  }}
+                  data-pin-id={pin._id}
+                  ref={node => {
+                    // Tooltip setup - Attach tippy instance to the node
+                    if (node) {
+                      if (!node._tippy) { // Create only if it doesn't exist
                         const title = pin.article?.title || 'Linked Article';
                         tippy(node, {
                           content: title,
-                          delay: [300, 0], // Small delay to prevent flicker during interactions
+                          delay: [300, 0],
                           placement: 'top',
                           arrow: true,
+                          // Hide on mousedown to prevent issues during drag/click
+                          hideOnClick: false, // We'll manage hide manually
+                          trigger: 'mouseenter focus', // Standard triggers
                         });
+                      } else {
+                        // Update content if needed (e.g., article title changes)
+                        node._tippy.setContent(pin.article?.title || 'Linked Article');
                       }
-                    }}
-                    data-pin-id={pin._id}
-                    style={{
-                      width: '100%', 
-                      height: '100%',
-                      cursor: pinsLocked ? 'pointer' : 'move',
-                    }}
-                    onClick={(e) => { 
-                      if (pinsLocked) {
-                        e.stopPropagation(); 
-                        onPinClick(pin.article?._id); 
+                    }
+                  }}
+                  onMouseDown={(e) => {
+                    // --- Start of onMouseDown ---
+                    if (pinsLocked) return; // Ignore if pins are locked
+                    if (e.button !== 0) return; // Only allow left clicks for dragging
+
+                    // Hide tooltip immediately on mousedown for unlocked pins
+                    const tippyInstance = e.currentTarget._tippy;
+                    if (tippyInstance) tippyInstance.hide();
+
+                    e.stopPropagation(); // Prevent map panning
+                    const target = e.currentTarget;
+                    target.style.cursor = 'grabbing'; // Change cursor to indicate dragging
+
+                    dragStartPos.current = { x: e.clientX, y: e.clientY };
+                    isDraggingRef.current = false; // Reset drag flag initially
+
+                    const imageRect = mapImageRef.current.getBoundingClientRect();
+
+                    // --- MouseMove Handler ---
+                    const handleMouseMove = (moveEvent) => {
+                      const dx = moveEvent.clientX - dragStartPos.current.x;
+                      const dy = moveEvent.clientY - dragStartPos.current.y;
+
+                      // Only start dragging if threshold is met
+                      if (!isDraggingRef.current && (Math.abs(dx) > dragThreshold || Math.abs(dy) > dragThreshold)) {
+                        isDraggingRef.current = true;
+                        // Update TransformWrapper state to disable panning during drag
+                        setTransformState(prev => ({...prev})); 
                       }
-                    }}
-                    onContextMenu={(e) => {
-                      e.stopPropagation(); 
-                      handleContextMenu(e); 
-                    }}
-                  >
-                    {renderPin(pin)}
-                  </div>
-                </Rnd>
+
+                      if (isDraggingRef.current) {
+                        // Use the current zoom scale from transformState
+                        const scale = transformState.scale || 1;
+                        // Calculate the unscaled cursor position relative to the image
+                        const unscaledCursorX = (moveEvent.clientX - imageRect.left) / scale;
+                        const unscaledCursorY = (moveEvent.clientY - imageRect.top) / scale;
+
+                        // Update the pin position using pixel values during drag for responsiveness
+                        target.style.left = `${unscaledCursorX}px`;
+                        target.style.top = `${unscaledCursorY}px`;
+                        // Ensure transform origin is correct for visual alignment
+                        // We keep the translate(-50%, -100%) from the style prop, so origin isn't strictly needed here
+                        // target.style.transformOrigin = 'center bottom'; // This might conflict with style prop transform
+                      }
+                    };
+
+                    // --- MouseUp Handler ---
+                    const handleMouseUp = (upEvent) => {
+                      target.style.cursor = 'grab'; // Reset cursor
+                      document.removeEventListener('mousemove', handleMouseMove);
+                      document.removeEventListener('mouseup', handleMouseUp);
+
+                      const tippyInstance = target._tippy; // Get tippy instance for potential hide
+
+                      if (isDraggingRef.current) {
+                        // --- Finalize Drag --- 
+                        // (Tooltip should already be hidden from onMouseDown)
+                        const scale = transformState.scale || 1;
+                        const finalUnscaledX = (upEvent.clientX - imageRect.left) / scale;
+                        const finalUnscaledY = (upEvent.clientY - imageRect.top) / scale;
+
+                        // Compute final percentage based on the untransformed image dimensions
+                        const finalX = finalUnscaledX / mapImageRef.current.offsetWidth;
+                        const finalY = finalUnscaledY / mapImageRef.current.offsetHeight;
+                        const clampedX = Math.max(0, Math.min(1, finalX));
+                        const clampedY = Math.max(0, Math.min(1, finalY));
+
+                        // Reset inline styles to use percentage-based positioning
+                        target.style.left = `${clampedX * 100}%`;
+                        target.style.top = `${clampedY * 100}%`;
+
+                        console.log(`Pin ${pin._id} positioned at: x=${clampedX}, y=${clampedY}`);
+                        onUpdatePinPosition(pin._id, { x: clampedX, y: clampedY });
+                      } else {
+                        // --- Handle Click (No Drag) ---
+                        // Explicitly hide tooltip before navigation for unlocked pins
+                        if (tippyInstance) tippyInstance.hide(); 
+                        
+                        // Navigate to the article since it wasn't a drag
+                        onPinClick(pin.article?._id);
+                      }
+
+                      // Reset drag flag and re-enable panning in TransformWrapper
+                      isDraggingRef.current = false;
+                       setTransformState(prev => ({...prev})); 
+                    };
+
+                    // Add event listeners
+                    document.addEventListener('mousemove', handleMouseMove);
+                    document.addEventListener('mouseup', handleMouseUp);
+                    // --- End of onMouseDown ---
+                  }}
+                  onClick={(e) => {
+                    // Prevent default click behavior if dragging occurred
+                    if (isDraggingRef.current) {
+                      e.stopPropagation();
+                      return;
+                    }
+
+                    // Handle click for LOCKED pins
+                    if (pinsLocked) {
+                       // Hide tooltip before navigating
+                      const tippyInstance = e.currentTarget._tippy;
+                      if (tippyInstance) tippyInstance.hide();
+                      
+                      e.stopPropagation(); // Prevent potential map interaction
+                      onPinClick(pin.article?._id);
+                    }
+                    // Click for UNLOCKED pins is handled in onMouseDown/handleMouseUp logic
+                  }}
+                  onContextMenu={(e) => {
+                     // Hide tooltip on context menu open
+                    const tippyInstance = e.currentTarget._tippy;
+                    if (tippyInstance) tippyInstance.hide();
+
+                    e.stopPropagation(); // Prevent map context menu
+                    handleContextMenu(e); // Show pin context menu
+                  }}
+                >
+                  {renderPin(pin)}
+                </div>
               );
             })}
           </div>
