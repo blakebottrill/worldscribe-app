@@ -112,11 +112,8 @@ const WikiPage = () => {
       mutationFn: syncArticleIconToPinsAPI,
       onSuccess: (data) => {
           console.log("Icon sync to pins successful:", data);
-          // Invalidate maps list AND individual map details queries
           queryClient.invalidateQueries({ queryKey: ['maps'] });
-          // Invalidate all queries starting with ['map'] to refresh individual map views
           queryClient.invalidateQueries({ queryKey: ['map'] }); 
-          toast.success('Synced icon to map pins!');
       },
       onError: (err) => {
           console.error("Error syncing icon to pins:", err);
@@ -198,7 +195,6 @@ const WikiPage = () => {
     },
     onSuccess: (savedArticle, articleData, context) => {
       const isCreating = !!context?.tempId;
-      toast.success(`Article ${isCreating ? 'created' : 'saved'} successfully!`);
       
       // Update cache with server data (replaces temp or updates existing)
       queryClient.setQueryData(['articles'], (old = []) => {
@@ -287,8 +283,6 @@ const WikiPage = () => {
       }
     },
     onSuccess: (data, articleId) => {
-      toast.success('Article deleted!');
-      // Ensure editor is cleared if it somehow wasn't in onMutate or if rollback failed
       if (editingArticleData?._id === articleId) {
         setEditingArticleData(null);
         setSelectedArticleId(null);
@@ -304,8 +298,6 @@ const WikiPage = () => {
   const generateArticleMutation = useMutation({
       mutationFn: generateArticleAPI,
       onSuccess: (generatedArticle) => {
-          toast.success("AI generated article content!");
-          // Add the NEW generated article using the save mutation (create mode)
           const tempId = `temp-${Date.now()}`;
           const articlePayload = {
               _id: tempId,

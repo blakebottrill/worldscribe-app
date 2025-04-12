@@ -120,6 +120,20 @@ const updatePinDetailsAPI = async ({ mapId, pinId, pinUpdatePayload }) => {
   return updatedPin; // Return the primary updated resource (the pin)
 };
 
+// Copied from WikiPage.jsx - TODO: Move API functions to a shared file
+const updateArticleAPI = async ({ articleId, articleData }) => {
+  const response = await fetch(`http://localhost:5001/api/articles/${articleId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(articleData),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ msg: 'Failed to update article' }));
+    throw new Error(errorData.msg || `HTTP error! status: ${response.status}`);
+  }
+  return response.json(); // Returns the updated article
+};
+
 // --- End API Functions ---
 
 const AtlasPage = () => {
@@ -162,9 +176,8 @@ const AtlasPage = () => {
   const deleteMapMutation = useMutation({
     mutationFn: deleteMapAPI,
     onSuccess: () => {
-      toast.success('Map deleted!');
-      setSelectedMap(null); // Clear selection
-      queryClient.invalidateQueries({ queryKey: ['maps'] }); // Invalidate the list
+      setSelectedMap(null);
+      queryClient.invalidateQueries({ queryKey: ['maps'] });
     },
     onError: (err) => {
       toast.error(`Failed to delete map: ${err.message}`);
@@ -174,8 +187,6 @@ const AtlasPage = () => {
   const deletePinMutation = useMutation({
     mutationFn: deletePinAPI,
     onSuccess: (data, variables) => {
-      toast.success('Pin deleted!');
-      // Invalidate the specific map data query to refresh MapView
       queryClient.invalidateQueries({ queryKey: ['map', variables.mapId] });
     },
     onError: (err) => {
@@ -186,8 +197,6 @@ const AtlasPage = () => {
   const updatePinPositionMutation = useMutation({
     mutationFn: updatePinPositionAPI,
     onSuccess: (data, variables) => {
-      toast.success('Pin position updated!');
-      // Invalidate the specific map data query
       queryClient.invalidateQueries({ queryKey: ['map', variables.mapId] });
     },
     onError: (err) => {
@@ -198,8 +207,6 @@ const AtlasPage = () => {
   const upsertPinLinkMutation = useMutation({
     mutationFn: upsertPinLinkAPI,
     onSuccess: (data, variables) => {
-      toast.success(variables.pinId ? 'Pin link updated!' : 'Pin added!');
-      // Invalidate the specific map data query
       queryClient.invalidateQueries({ queryKey: ['map', variables.mapId] });
     },
     onError: (err) => {
@@ -209,16 +216,41 @@ const AtlasPage = () => {
 
   const updatePinDetailsMutation = useMutation({
     mutationFn: updatePinDetailsAPI,
-    onSuccess: (data, variables) => {
-      toast.success('Pin details updated!');
-      // Invalidate the specific map data query
+    onSuccess: (updatedPin, variables) => {
       queryClient.invalidateQueries({ queryKey: ['map', variables.mapId] });
-      // Also invalidate articles if icon sync was involved (although that logic moved)
-      // queryClient.invalidateQueries({ queryKey: ['articles'] });
+
+      // --- BEGIN SYNC TO ARTICLE --- 
+      const previousIcon = variables.pinUpdatePayload?.previousIcon;
+      const previousIconId = variables.pinUpdatePayload?.previousIconId;
+      const articleId = variables.pinUpdatePayload?.articleId;
+      const currentIcon = updatedPin.icon; // Use icon from the successfully updated pin
+      const currentIconId = updatedPin.iconId; // Use iconId from the successfully updated pin
+
+      if (articleId && currentIcon && currentIconId && (currentIcon !== previousIcon || currentIconId !== previousIconId)) {
+          console.log(`Pin icon changed for article ${articleId}. Triggering article update...`);
+          updateArticleMutation.mutate({
+              articleId: articleId,
+              articleData: { icon: currentIcon, iconId: currentIconId } // Only update icon fields
+          });
+      }
+      // --- END SYNC TO ARTICLE ---
     },
     onError: (err) => {
       toast.error(`Failed to update pin details: ${err.message}`);
     }
+  });
+
+  // Mutation for updating articles (for sync purposes)
+  const updateArticleMutation = useMutation({
+      mutationFn: updateArticleAPI,
+      onSuccess: (updatedArticle) => {
+          console.log(`Successfully synced icon update to article ${updatedArticle._id}`);
+          queryClient.invalidateQueries({ queryKey: ['articles'] });
+      },
+      onError: (err, variables) => {
+          console.error(`Error syncing icon update to article ${variables.articleId}:`, err);
+          toast.error(`Failed to sync icon update to article: ${err.message}`);
+      }
   });
 
   const handleMapSelect = (map) => {
@@ -347,7 +379,7 @@ const AtlasPage = () => {
   };
   
   const handlePinEditSave = (updatedPinDataFromModal) => {
-      const { pin: pinFromModal, linkedArticle, ...pinUpdatePayload } = updatedPinDataFromModal;
+      const { pin: pinFromModal, linkedArticle, ...pinUpdatePayloadFromModal } = updatedPinDataFromModal;
       
       if (!selectedMap || !pinFromModal || !pinFromModal._id) {
           console.error("Missing data needed to update pin.");
@@ -357,19 +389,20 @@ const AtlasPage = () => {
 
       setShowPinEditModal(false);
       
-      // Trigger the mutation with only the necessary details
+      // Construct the payload for updatePinDetailsMutation
+      // Include the original icon/iconId for comparison in onSuccess
+      const finalPinUpdatePayload = {
+        ...pinUpdatePayloadFromModal, // New values from modal state (icon, shape, color, etc.)
+        articleId: pinFromModal.article?._id, // Include articleId for onSuccess check
+        previousIcon: pinFromModal.icon, // Original icon from before edit
+        previousIconId: pinFromModal.iconId // Original iconId from before edit
+      };
+
+      // Trigger the mutation with the combined payload
       updatePinDetailsMutation.mutate({ 
           mapId: selectedMap._id, 
           pinId: pinFromModal._id, 
-          pinUpdatePayload: {
-              icon: pinUpdatePayload.icon, // Use data from form state
-              iconId: pinUpdatePayload.iconId,
-              shape: pinUpdatePayload.shape,
-              color: pinUpdatePayload.color,
-              displayType: pinUpdatePayload.displayType,
-              // Include articleId for potential future use in API or context, but API ignores it
-              articleId: pinFromModal.article?._id 
-          }
+          pinUpdatePayload: finalPinUpdatePayload
       });
       
       // Reset editing state
@@ -426,7 +459,7 @@ const AtlasPage = () => {
                         {selectedMap ? (
                           <MapView 
                             mapId={selectedMap._id} 
-                            // key={mapRefreshKey} // Remove key hack
+                            key={selectedMap._id} // Add key based on mapId to force remount
                             onPinClick={handlePinClick} 
                             onDeletePin={handleDeletePin} // Pass refactored handler
                             onShowLinkModal={handleShowPinLinkModal}
