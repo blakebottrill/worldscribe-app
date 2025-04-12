@@ -449,7 +449,7 @@ const AtlasPage = () => {
       {!isLoading && !error && (
           <> 
               {showUploadForm ? (
-                <MapUploadForm onSuccess={handleUploadSuccess} />
+                <MapUploadForm onSuccess={handleUploadSuccess} onClose={handleToggleUpload} />
               ) : (
                 <div>
                   {maps.length > 0 ? (
