@@ -1,0 +1,81 @@
+/* client/src/components/timeline/TimelineItem.css */
+
+.timeline-item {
+  position: absolute; 
+  /* Calculate top position based on lane index and item height */
+  /* Assumes --lane-index starts at 0 */
+  top: calc(var(--lane-index, 0) * 60px + 10px); /* 60px = height + gap */
+  transform: none; /* Remove translateY(-50%) */
+  height: 55px; /* Match image aspect ratio */
+  min-width: 50px; /* Reduced min width for point events */
+  max-width: 400px; /* Add max width */
+  padding: 0 15px; /* Horizontal padding */
+  border-radius: 9999px; /* Fully rounded ends */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: white;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.3); /* Slightly more visible border */
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+  white-space: nowrap; /* Prevent text wrapping */
+  overflow: hidden; /* Hide overflow */
+  /* Use a CSS variable for the item color */
+  background-color: var(--item-bg-color, #3b82f6);
+  box-shadow: 0 0 15px 0px var(--item-shadow-color, #3b82f6);
+}
+
+.timeline-item:hover {
+  transform: scale(1.03); /* Adjust hover transform */
+  box-shadow: 0 0 25px 3px var(--item-shadow-color, #3b82f6); /* Enhanced glow */
+}
+
+.timeline-item-icon {
+  flex-shrink: 0; /* Prevent icon from shrinking */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Add background or styling if needed */
+}
+
+.timeline-item-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden; /* Prevent content overflow */
+}
+
+.timeline-item-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* Add ellipsis if title is too long */
+}
+
+.timeline-item-dates {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* Add ellipsis if dates are too long */
+}
+
+/* Optional Handle Styles */
+.timeline-item-handle {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 5px;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: ew-resize; /* East-west resize cursor */
+  font-size: 1.2em;
+}
+
+.timeline-item-handle.left {
+  left: 5px;
+}
+
+.timeline-item-handle.right {
+  right: 5px;
+} 

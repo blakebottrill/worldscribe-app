@@ -1,18 +1,26 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FaSpinner } from 'react-icons/fa';
+import { FaSpinner, FaPlus } from 'react-icons/fa';
 import toast from 'react-hot-toast';
-import TimelineEventList from '../components/timeline/TimelineEventList';
+// import TimelineEventList from '../components/timeline/TimelineEventList';
+import HorizontalTimelineView from '../components/timeline/HorizontalTimelineView';
 import TimelineEventForm from '../components/timeline/TimelineEventForm';
 import ArticleLinkModal from '../components/common/ArticleLinkModal';
+import './TimelinePage.css';
 // TODO: Import components later
 
 // --- Utility Functions ---
-const extractFirstNumber = (str) => {
-  if (!str) return Infinity;
-  const match = str.match(/\d+/);
-  return match ? parseInt(match[0], 10) : Infinity;
+const parseDate = (dateString) => {
+  if (!dateString) return null;
+  // This is basic, assumes YYYY or YYYY-MM-DD formats mostly
+  // Consider using a date library like Moment.js or date-fns for robustness
+  const yearMatch = dateString.match(/^(\d{1,4})/); 
+  if (yearMatch) {
+      // Attempt to create a date, might need refinement based on actual date formats
+      return new Date(dateString);
+  }
+  return null;
 };
 
 // --- API Functions ---
@@ -20,8 +28,14 @@ const fetchTimelineEventsAPI = async () => {
   const response = await fetch('http://localhost:5001/api/timeline');
   if (!response.ok) throw new Error('Failed to fetch timeline events');
   const data = await response.json();
-  // Sort events after fetching
-  return data.sort((a, b) => extractFirstNumber(a.dateString) - extractFirstNumber(b.dateString));
+  // TODO: Update sorting based on startDate
+  return data.sort((a, b) => {
+    const dateA = parseDate(a.startDate || a.dateString);
+    const dateB = parseDate(b.startDate || b.dateString);
+    if (!dateA) return 1;
+    if (!dateB) return -1;
+    return dateA.getTime() - dateB.getTime();
+  });
 };
 
 const fetchArticlesAPI = async () => { // Reusing from WikiPage refactor
@@ -126,7 +140,13 @@ const TimelinePage = () => {
                 );
             }
             // Re-sort after optimistic update
-            return newEvents.sort((a, b) => extractFirstNumber(a.dateString) - extractFirstNumber(b.dateString));
+            return newEvents.sort((a, b) => {
+                const dateA = parseDate(a.startDate || a.dateString);
+                const dateB = parseDate(b.startDate || b.dateString);
+                if (!dateA) return 1;
+                if (!dateB) return -1;
+                return dateA.getTime() - dateB.getTime();
+            });
         });
         
         // Close form immediately on optimistic update
@@ -153,7 +173,13 @@ const TimelinePage = () => {
                     ? savedEvent 
                     : event
              );
-             return updatedEvents.sort((a, b) => extractFirstNumber(a.dateString) - extractFirstNumber(b.dateString));
+             return updatedEvents.sort((a, b) => {
+                const dateA = parseDate(a.startDate || a.dateString);
+                const dateB = parseDate(b.startDate || b.dateString);
+                if (!dateA) return 1;
+                if (!dateB) return -1;
+                return dateA.getTime() - dateB.getTime();
+             });
         });
     },
     onSettled: () => {
@@ -252,65 +278,58 @@ const TimelinePage = () => {
 
   // --- Render Logic ---
   return (
-    <div className="timeline-page-container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h2>Timeline / Calendar</h2>
-         {/* Button toggles form visibility, text changes based on state */}
-         <button onClick={handleAddClick} disabled={saveEventMutation.isPending || deleteEventMutation.isPending}>
-          {isFormVisible ? 'Cancel' : '+ Add Event'}
+    <div className="timeline-page">
+      <div className="timeline-page-header">
+        <h2>Timeline</h2>
+        <button onClick={handleAddClick} className="add-event-button">
+          <FaPlus /> {showAddForm ? 'Cancel' : 'Add Event'}
         </button>
       </div>
 
-      {/* Display combined loading state */}
+      {/* Conditionally render Add/Edit Form */} 
+      {showAddForm && (
+          <TimelineEventForm 
+            event={editingEvent} // Pass null for add, event data for edit
+            articles={articles}
+            onSubmit={handleFormSubmit}
+            onCancel={handleFormCancel}
+            onShowLinkModal={handleShowLinkModal}
+          />
+      )}
+      
+      {/* Show loading spinner */}
       {isLoading && (
-           <div style={{ display: 'flex', justifyContent: 'center', padding: '20px' }}>
-               <FaSpinner className="spinner" size={24} />
-           </div>
-      )}
-      {/* Display combined error state */}
-      {error && <p style={{ color: 'red' }}>Error loading data: {error.message}</p>}
-
-      {/* Render Form conditionally */}
-      {isFormVisible && (
-        <TimelineEventForm
-          // Key ensures form resets when switching between add/edit or different events
-          key={editingEvent?._id || 'add'}
-          initialData={editingEvent} // Pass the event being edited (or null for add)
-          // Pass the mutation function for submission
-          onSubmit={handleFormSubmit} 
-          onCancel={handleFormCancel}
-          articles={articles} // Pass article list for linking
-          onShowLinkModal={handleShowLinkModal} // Pass modal handler
-          // Pass mutation state to disable form elements
-          isSubmitting={saveEventMutation.isPending}
-          // Pass mutation error state to display within the form?
-          submitError={saveEventMutation.isError ? saveEventMutation.error : null}
-        />
+        <div className="loading-container">
+          <FaSpinner className="spinner" /> Loading events...
+        </div>
       )}
 
-      {/* Render Event List */}
-      {!isLoadingEvents && !eventsError && (
-        <TimelineEventList 
+      {/* Show error message */}
+      {error && <div className="error-container">Error loading data: {error.message}</div>}
+      
+      {/* Render Horizontal Timeline View */}
+      {!isLoading && !error && (
+        <HorizontalTimelineView 
           events={events} // Pass events from query
-          onNavigateToArticle={handleNavigateToArticle}
-          onEdit={handleEdit}
-          onDelete={handleDelete} // Pass refactored delete handler
-          // Disable edit/delete buttons while mutations are pending?
-          isDisabled={saveEventMutation.isPending || deleteEventMutation.isPending}
+          // Decide what happens when an event is clicked
+          // Option 1: Open the edit form
+          onEventClick={handleEdit} 
+          // Option 2: Navigate to linked article (if exists)
+          // onEventClick={(event) => handleNavigateToArticle(event.linkedArticle)}
         />
       )}
 
       {/* Article Link Modal (remains the same) */}
       {showArticleLinkModal && (
         <ArticleLinkModal
-          articles={articles} // Pass articles from query
+          articles={articles} 
           currentArticleId={linkModalCurrentId}
-          onSelectArticle={handleModalSelectArticle}
+          onSelectArticle={handleModalSelectArticle} 
           onClose={() => {
               setShowArticleLinkModal(false);
               setLinkModalTargetSetter(null);
               setLinkModalCurrentId(null);
-          }}
+          }} 
         />
       )}
     </div>

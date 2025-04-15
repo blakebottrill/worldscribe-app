@@ -1,0 +1,59 @@
+/* client/src/pages/TimelinePage.css */
+
+.timeline-page {
+  padding: 20px;
+  color: var(--text-primary);
+}
+
+.timeline-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.timeline-page-header h2 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.add-event-button {
+  padding: 8px 15px;
+  background-color: var(--accent-blue);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.add-event-button:hover {
+  background-color: var(--accent-blue-darker); /* Slightly darker on hover */
+}
+
+.loading-container,
+.error-container {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-secondary);
+}
+
+.error-container {
+  color: var(--error-color, #e53e3e);
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  margin-right: 10px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+} 
