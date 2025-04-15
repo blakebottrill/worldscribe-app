@@ -3,6 +3,76 @@ import * as FaIcons from 'react-icons/fa';
 import IconPicker from '../common/IconPicker';
 import './PinEditModal.css';
 
+// --- Contrast Calculation Utilities ---
+
+// Function to parse hex color to RGB
+function hexToRgb(hex) {
+  let shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+  hex = hex.replace(shorthandRegex, function(m, r, g, b) {
+    return r + r + g + g + b + b;
+  });
+
+  let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : null;
+}
+
+// Function to calculate relative luminance
+function getLuminance(r, g, b) {
+  let a = [r, g, b].map(function (v) {
+    v /= 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+}
+
+// Function to calculate contrast ratio between a color and white
+function getContrastWithWhite(hexColor) {
+  const rgb = hexToRgb(hexColor);
+  if (!rgb) return 1; // Default to low contrast if parse fails
+
+  const lum1 = getLuminance(rgb.r, rgb.g, rgb.b);
+  const lum2 = 1; // Luminance of white
+
+  const brightest = Math.max(lum1, lum2);
+  const darkest = Math.min(lum1, lum2);
+
+  return (brightest + 0.05) / (darkest + 0.05);
+}
+
+// Function to determine icon color based on contrast
+function getIconColorForContrast(pinColorHex) {
+  const contrastThreshold = 3.0; // WCAG AA for graphical objects
+  const contrast = getContrastWithWhite(pinColorHex);
+  
+  // If contrast with white is too low, use black icon
+  return contrast < contrastThreshold ? '#000000' : '#FFFFFF';
+}
+
+// --- End Contrast Calculation Utilities ---
+
+// Helper function to get vertical shift for centering shapes in viewBox
+function getShapeVerticalShift(shapeId) {
+  switch (shapeId) {
+    case 'circle':
+    case 'square':
+    case 'arch':
+    case 'shield':
+      return 5; // Shapes using 0-20 height need shift down
+    case 'flag':
+    case 'ribbon':
+      return 2.5; // Shapes using 0-25 height
+    case 'chevron':
+      return 2; // Shape using 0-26 height
+    case 'pin':
+    default:
+      return 0; // Pin uses full height
+  }
+}
+
 // Define SVG paths for custom pin shapes
 const PIN_SHAPES = {
   'pin': 'M10,0 C4.5,0 0,4.5 0,10 C0,15.5 10,30 10,30 C10,30 20,15.5 20,10 C20,4.5 15.5,0 10,0 Z',
@@ -137,6 +207,7 @@ const PinEditModal = ({
     const IconComponent = FaIcons[selectedIcon] || FaIcons.FaHome;
     const shapePath = PIN_SHAPES[selectedShape] || PIN_SHAPES.pin;
     const pinColor = selectedColor; // Use the state variable for color
+    const iconColor = getIconColorForContrast(pinColor); // Determine icon color for preview
     
     // Handle icon-only case separately (no SVG shape)
     if (displayType === 'icon-only') {
@@ -152,7 +223,8 @@ const PinEditModal = ({
             // Apply filter for stroke effect
             filter: 'drop-shadow(0px 0px 1px rgba(0, 0, 0, 1)) drop-shadow(0px 0px 1px rgba(0, 0, 0, 1)) drop-shadow(0px 0px 1px rgba(0, 0, 0, 1))'
           }}>
-            <IconComponent color="#fff" size="1.2em" />
+            {/* Icon-only preview should also use white icon with black stroke */}
+            <IconComponent color="#FFFFFF" size="1.2em" /> 
           </div>
         </div>
       );
@@ -181,7 +253,7 @@ const PinEditModal = ({
                 height="14"
               > 
                 <div xmlns="http://www.w3.org/1999/xhtml" style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                  <IconComponent size="90%" color="#fff" />
+                  <IconComponent size="90%" color={iconColor} /> {/* Use calculated icon color */}
                 </div>
               </foreignObject>
             )}
@@ -280,9 +352,14 @@ const PinEditModal = ({
                       key={shapeId}
                       className={`shape-button ${selectedShape === shapeId ? 'selected' : ''}`}
                       onClick={() => setSelectedShape(shapeId)}
+                      title={shapeId.charAt(0).toUpperCase() + shapeId.slice(1)}
                     >
-                      <svg width="30" height="30" viewBox="0 0 20 30" xmlns="http://www.w3.org/2000/svg">
-                        <path d={PIN_SHAPES[shapeId]} fill="currentColor" />
+                      <svg width="100%" height="100%" viewBox="0 0 20 30" xmlns="http://www.w3.org/2000/svg">
+                        <path 
+                          d={PIN_SHAPES[shapeId]} 
+                          fill="currentColor" 
+                          transform={`translate(0, ${getShapeVerticalShift(shapeId)})`}
+                        />
                       </svg>
                     </button>
                   ))}

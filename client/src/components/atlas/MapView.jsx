@@ -31,6 +31,57 @@ const PIN_SHAPES = {
   'chevron': 'M0,0 H20 V20 L10,26 L0,20 Z'
 };
 
+// --- Contrast Calculation Utilities ---
+
+// Function to parse hex color to RGB
+function hexToRgb(hex) {
+  let shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+  hex = hex.replace(shorthandRegex, function(m, r, g, b) {
+    return r + r + g + g + b + b;
+  });
+
+  let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : null;
+}
+
+// Function to calculate relative luminance
+function getLuminance(r, g, b) {
+  let a = [r, g, b].map(function (v) {
+    v /= 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+}
+
+// Function to calculate contrast ratio between a color and white
+function getContrastWithWhite(hexColor) {
+  const rgb = hexToRgb(hexColor);
+  if (!rgb) return 1; // Default to low contrast if parse fails
+
+  const lum1 = getLuminance(rgb.r, rgb.g, rgb.b);
+  const lum2 = 1; // Luminance of white
+
+  const brightest = Math.max(lum1, lum2);
+  const darkest = Math.min(lum1, lum2);
+
+  return (brightest + 0.05) / (darkest + 0.05);
+}
+
+// Function to determine icon color based on contrast
+function getIconColorForContrast(pinColorHex) {
+  const contrastThreshold = 3.0; // WCAG AA for graphical objects
+  const contrast = getContrastWithWhite(pinColorHex);
+  
+  // If contrast with white is too low, use black icon
+  return contrast < contrastThreshold ? '#000000' : '#FFFFFF';
+}
+
+// --- End Contrast Calculation Utilities ---
+
 // API function to fetch a specific map
 const fetchMapDataById = async (mapId) => {
   if (!mapId) return null;
@@ -225,16 +276,19 @@ const MapView = ({
     const pinColor = pin.color || '#dc3545';
     const shapePath = PIN_SHAPES[pin.shape || 'pin'] || PIN_SHAPES.pin;
     const IconComponent = getPinIcon(pin);
+    const iconColor = getIconColorForContrast(pinColor); // Determine icon color based on contrast
     
     // Don't show the shape if icon-only mode
     if (displayType === 'icon-only') {
+      // For icon-only, the stroke effect uses drop-shadow, 
+      // so the icon color itself needs to provide contrast against the map.
+      // We might need a different strategy here if the map background varies wildly.
+      // For now, let's keep it simple and use the contrast-checked color.
+      // A better approach might be a fixed white icon with a black outline filter as done previously.
+      const iconOnlyColor = getIconColorForContrast(pinColor); // Or potentially force white/black based on overall map brightness?
+
       return (
         <div className="map-pin icon-only-pin" style={{ 
-          // Remove background, border, padding, borderRadius
-          // backgroundColor: pinColor, // Removed
-          // padding: '4px', // Removed
-          // borderRadius: '50%', // Removed
-          // border: '2px solid #fff', // Removed
           boxShadow: 'none', // Remove original shadow if conflicting
           display: 'flex',
           justifyContent: 'center',
@@ -244,7 +298,8 @@ const MapView = ({
           // Apply filter for stroke effect - multiple shadows enhance the stroke
           filter: 'drop-shadow(0px 0px 1px rgba(0, 0, 0, 1)) drop-shadow(0px 0px 1px rgba(0, 0, 0, 1)) drop-shadow(0px 0px 1px rgba(0, 0, 0, 1))'
         }}>
-          <IconComponent color="#fff" size="80%" />
+          {/* Icon-only pins need a stroke for visibility, color contrast check is less useful */}
+          <IconComponent color="#FFFFFF" size="80%" /> 
         </div>
       );
     }
@@ -280,7 +335,7 @@ const MapView = ({
             > 
               {/* The xmlns is necessary for foreignObject to render correctly */}
               <div xmlns="http://www.w3.org/1999/xhtml" style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                 <IconComponent size="90%" color="#fff" />
+                 <IconComponent size="90%" color={iconColor} /> {/* Use calculated icon color */}
               </div>
             </foreignObject>
           )}
@@ -290,7 +345,7 @@ const MapView = ({
   };
 
   return (
-    <div style={containerStyle} ref={mapContainerRef}
+    <div className="map-view-container" ref={mapContainerRef}
          onMouseUp={() => {
            // Reset map dragging state when mouse is released anywhere in the container
            // Use a slight delay to let other handlers check the current state first

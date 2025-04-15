@@ -1,5 +1,19 @@
 /* client/src/components/atlas/MapView.css */
 
+.map-view-container {
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--border-color); /* Use theme border color */
+  overflow: hidden;
+  position: relative;
+  /* Dark grid background */
+  background-color: var(--background-color, #2D3748); /* Use theme background or dark default */
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 25px 25px; /* Slightly larger grid squares */
+}
+
 .pin-wrapper {
   /* Base transform for standard pins */
   transform: translate(-50%, -100%); 
