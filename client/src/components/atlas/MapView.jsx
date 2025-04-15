@@ -59,6 +59,7 @@ const MapView = ({
   // Add refs to manage drag state
   const dragStartPos = useRef({ x: 0, y: 0 });
   const isDraggingRef = useRef(false);
+  const mapIsDragging = useRef(false); // Track if the map is being dragged
   const dragThreshold = 5; // Pixels threshold to initiate drag
 
   // Use hook for both menus
@@ -229,16 +230,19 @@ const MapView = ({
     if (displayType === 'icon-only') {
       return (
         <div className="map-pin icon-only-pin" style={{ 
-          backgroundColor: pinColor,
-          padding: '4px',
-          borderRadius: '50%',
-          border: '2px solid #fff',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+          // Remove background, border, padding, borderRadius
+          // backgroundColor: pinColor, // Removed
+          // padding: '4px', // Removed
+          // borderRadius: '50%', // Removed
+          // border: '2px solid #fff', // Removed
+          boxShadow: 'none', // Remove original shadow if conflicting
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
           width: '100%',
-          height: '100%'
+          height: '100%',
+          // Apply filter for stroke effect - multiple shadows enhance the stroke
+          filter: 'drop-shadow(0px 0px 1px rgba(0, 0, 0, 1)) drop-shadow(0px 0px 1px rgba(0, 0, 0, 1)) drop-shadow(0px 0px 1px rgba(0, 0, 0, 1))'
         }}>
           <IconComponent color="#fff" size="80%" />
         </div>
@@ -280,7 +284,15 @@ const MapView = ({
   };
 
   return (
-    <div style={containerStyle} ref={mapContainerRef}>
+    <div style={containerStyle} ref={mapContainerRef}
+         onMouseUp={() => {
+           // Reset map dragging state when mouse is released anywhere in the container
+           // Use a slight delay to let other handlers check the current state first
+           setTimeout(() => {
+             mapIsDragging.current = false;
+           }, 100);
+         }}
+    >
       <TransformWrapper 
         onTransformed={(ref) => {
           // Update transform state
@@ -305,6 +317,16 @@ const MapView = ({
               }
             });
           }, 10);
+        }}
+        onPanningStart={() => {
+          // Set flag when map panning begins
+          mapIsDragging.current = true;
+        }}
+        onPanningStop={() => {
+          // Reset flag when panning stops, with a slight delay to ensure mouseup events can check it
+          setTimeout(() => {
+            mapIsDragging.current = false;
+          }, 50);
         }}
         limitToBounds={false}
         // Disable panning when dragging a pin
@@ -358,8 +380,8 @@ const MapView = ({
                     left: `${initialLeft}%`,
                     top: `${initialTop}%`,
                     // Adjust size for icon-only pins if needed, otherwise use default
-                    width: isIconOnly ? '20px' : `${pinWidth}px`, // Example: smaller width for icon-only
-                    height: isIconOnly ? '20px' : `${pinHeight}px`, // Example: smaller height for icon-only
+                    width: isIconOnly ? '28px' : `${pinWidth}px`, // Increased icon-only size
+                    height: isIconOnly ? '28px' : `${pinHeight}px`, // Increased icon-only size
                     cursor: pinsLocked ? 'pointer' : 'grab',
                     zIndex: 5,
                   }}
@@ -461,12 +483,13 @@ const MapView = ({
 
                         console.log(`Pin ${pin._id} positioned at: x=${clampedX}, y=${clampedY}`);
                         onUpdatePinPosition(pin._id, { x: clampedX, y: clampedY });
-                      } else {
-                        // --- Handle Click (No Drag) ---
+                      } else if (!mapIsDragging.current) {
+                        // --- Handle Click (No Drag) and No Map Panning ---
+                        // Only navigate if the map was not being dragged
                         // Explicitly hide tooltip before navigation for unlocked pins
                         if (tippyInstance) tippyInstance.hide(); 
                         
-                        // Navigate to the article since it wasn't a drag
+                        // Navigate to the article since it wasn't a drag and map wasn't panned
                         onPinClick(pin.article?._id);
                       }
 
@@ -488,7 +511,7 @@ const MapView = ({
                     }
 
                     // Handle click for LOCKED pins
-                    if (pinsLocked) {
+                    if (pinsLocked && !mapIsDragging.current) {
                        // Hide tooltip before navigating
                       const tippyInstance = e.currentTarget._tippy;
                       if (tippyInstance) tippyInstance.hide();

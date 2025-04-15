@@ -143,16 +143,14 @@ const PinEditModal = ({
       return (
         <div className="pin-preview icon-only-pin-preview">
           <div style={{ 
-            backgroundColor: pinColor,
-            padding: '5px', // Adjust padding for preview size
-            borderRadius: '50%',
-            border: '2px solid #fff', // White border like map version
-            boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+            boxShadow: 'none', // Match MapView style
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            width: '30px', // Adjust size for preview
-            height: '30px'
+            width: '30px', // Maintain preview size
+            height: '30px', // Maintain preview size
+            // Apply filter for stroke effect
+            filter: 'drop-shadow(0px 0px 1px rgba(0, 0, 0, 1)) drop-shadow(0px 0px 1px rgba(0, 0, 0, 1)) drop-shadow(0px 0px 1px rgba(0, 0, 0, 1))'
           }}>
             <IconComponent color="#fff" size="1.2em" />
           </div>
