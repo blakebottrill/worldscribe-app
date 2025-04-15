@@ -26,9 +26,9 @@ const PIN_SHAPES = {
   'square': 'M0,0 H20 V20 H0 Z',
   'arch': 'M0,20 H20 V10 C20,4.5 15.5,0 10,0 C4.5,0 0,4.5 0,10 Z',
   'shield': 'M10,0 L20,5 V12 C20,16.5 15.5,20 10,20 C4.5,20 0,16.5 0,12 V5 Z',
-  'flag': 'M0,0 H20 V15 L15,12.5 L10,15 L5,12.5 L0,15 Z',
+  'flag': 'M0,0 H20 V25 L15,22.5 L10,25 L5,22.5 L0,25 Z',
   'ribbon': 'M0,0 H20 V25 L10,20 L0,25 Z',
-  'chevron': 'M0,0 H20 V15 L10,20 L0,15 Z'
+  'chevron': 'M0,0 H20 V20 L10,26 L0,20 Z'
 };
 
 // API function to fetch a specific map
@@ -271,7 +271,13 @@ const MapView = ({
           
           {/* Icon embedded inside SVG using foreignObject */}
           {displayType !== 'hide-icon' && (
-            <foreignObject x="3" y="3" width="14" height="14"> 
+            <foreignObject 
+              // Adjust position based on shape type
+              x="3" 
+              y={pin.shape === 'chevron' ? '4.5' : (pin.shape === 'flag' ? '4.5' : '3')} 
+              width="14" 
+              height="14"
+            > 
               {/* The xmlns is necessary for foreignObject to render correctly */}
               <div xmlns="http://www.w3.org/1999/xhtml" style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                  <IconComponent size="90%" color="#fff" />
