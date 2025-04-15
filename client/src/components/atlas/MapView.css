@@ -1,0 +1,62 @@
+/* client/src/components/atlas/MapView.css */
+
+.pin-wrapper {
+  /* Base transform for standard pins */
+  transform: translate(-50%, -100%); 
+  transform-origin: center bottom; /* Scale from bottom center */
+  transition: transform 0.2s ease-in-out; /* Smooth transition for scaling */
+  pointer-events: auto;
+}
+
+.pin-wrapper:hover {
+  /* Combine scale with the original translation */
+  transform: translate(-50%, -100%) scale(1.25); /* Increased scale */
+  z-index: 10; /* Ensure hovered pin is on top */
+}
+
+/* Styles for the icon-only pin */
+.icon-only-pin-wrapper {
+  /* Base transform for icon-only centering */
+  transform: translate(-50%, -50%);
+  transform-origin: center bottom; /* Scale from bottom center */
+  transition: transform 0.2s ease-in-out;
+  pointer-events: auto;
+}
+
+.icon-only-pin-wrapper:hover {
+   transform: translate(-50%, -50%) scale(1.25); /* Increased scale */
+   z-index: 10; /* Ensure hovered pin is on top */
+}
+
+/* Keep internal scaling transition if needed, but hover is on wrapper */
+.map-pin.icon-only-pin {
+  transition: transform 0.2s ease-in-out;
+}
+
+/* Tooltip Styles - Target tippy elements */
+.tippy-box {
+  margin-bottom: 0 !important; /* Reset any global margins */
+}
+
+/* Target the tippy arrow */
+.tippy-box[data-placement^='top'] > .tippy-arrow {
+  bottom: -10px; /* Standard position */
+}
+
+/* Custom theme for map pin tooltips */
+.tippy-box[data-theme~='map-pin-tooltip'] {
+  /* Remove restrictions on transforms */
+  /* transform: none !important; - This was preventing dynamic positioning */
+  z-index: 999 !important; /* Maintain high z-index */
+  background-color: #333;
+  color: white;
+  border-radius: 5px;
+  /* Use box-shadow for visibility */
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* Make sure arrow stays connected to box */
+.tippy-box[data-theme~='map-pin-tooltip'] .tippy-arrow {
+  color: #333;
+  bottom: -10px; /* Standard position */
+} 

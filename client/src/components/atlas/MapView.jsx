@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import tippy from 'tippy.js'; // Import tippy
 import { Menu, Item, useContextMenu } from 'react-contexify'; // Import context menu components
@@ -7,7 +7,14 @@ import { Rnd } from 'react-rnd'; // Import Rnd
 import * as FaIcons from 'react-icons/fa'; // Import Font Awesome icons
 import { useQuery } from '@tanstack/react-query'; // Import useQuery
 import { FaSpinner } from 'react-icons/fa'; // Import spinner
-// tippy.css is already imported in main.jsx
+import './MapView.css'; // Import the CSS file
+import 'tippy.js/dist/tippy.css'; // Default tippy styling
+import 'react-contexify/ReactContexify.css'; // Default context menu styling
+
+// Register a custom theme for tippy
+tippy.setDefaultProps({
+  theme: 'map-pin-tooltip',
+});
 
 const PIN_MENU_ID = "pin-context-menu";
 const MAP_MENU_ID = "map-context-menu"; // New ID for map menu
@@ -56,6 +63,31 @@ const MapView = ({
 
   // Use hook for both menus
   const { show } = useContextMenu();
+
+  // Helper function to calculate dynamic tooltip offset based on zoom level
+  const getDynamicTooltipOffset = () => {
+    const scale = transformState.scale || 1;
+    // Base offset when scale is 1 (reduced from 25 to be closer to pin)
+    const baseOffset = 15; 
+    // Calculate a proportional offset - smaller when zoomed out, larger when zoomed in
+    return [0, Math.round(baseOffset * scale)];
+  };
+
+  // Update tooltip offsets when zoom changes
+  useEffect(() => {
+    // Get all pin elements with tooltips
+    const pinElements = document.querySelectorAll('.pin-wrapper, .icon-only-pin-wrapper');
+    
+    // Calculate the new offset based on current zoom level
+    const newOffset = getDynamicTooltipOffset();
+    
+    // Update each tooltip's offset
+    pinElements.forEach(el => {
+      if (el._tippy) {
+        el._tippy.setProps({ offset: newOffset });
+      }
+    });
+  }, [transformState.scale]); // Only run when scale changes
 
   // Fetch map data using React Query
   const { data: mapData, isLoading, error } = useQuery({
@@ -226,31 +258,23 @@ const MapView = ({
         <svg width="100%" height="100%" viewBox="0 0 20 30" xmlns="http://www.w3.org/2000/svg" 
           style={{
             filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.5))',
+            overflow: 'visible' // Allow stroke to be fully visible
           }}>
-          <path d={shapePath} fill={pinColor} stroke="#fff" strokeWidth="1"/>
+          {/* Black Outer Stroke */}
+          <path d={shapePath} fill="none" stroke="#000000" strokeWidth="3" strokeLinejoin="round"/>
+          {/* White Inner Stroke + Fill */}
+          <path d={shapePath} fill={pinColor} stroke="#FFFFFF" strokeWidth="1.5" strokeLinejoin="round"/>
+          
+          {/* Icon embedded inside SVG using foreignObject */}
+          {displayType !== 'hide-icon' && (
+            <foreignObject x="3" y="3" width="14" height="14"> 
+              {/* The xmlns is necessary for foreignObject to render correctly */}
+              <div xmlns="http://www.w3.org/1999/xhtml" style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                 <IconComponent size="90%" color="#fff" />
+              </div>
+            </foreignObject>
+          )}
         </svg>
-        
-        {/* Only show icon if not in hide-icon mode */}
-        {displayType !== 'hide-icon' && (
-          <div style={{ 
-            position: 'absolute',
-            top: pin.shape === 'pin' ? '20%' : '25%', 
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            color: '#fff',
-            zIndex: 2,
-            backgroundColor: 'rgba(0,0,0,0.4)',
-            borderRadius: '50%',
-            padding: '2px',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            width: '12px',
-            height: '12px',
-          }}>
-            <IconComponent size="90%" />
-          </div>
-        )}
       </div>
     );
   };
@@ -258,7 +282,30 @@ const MapView = ({
   return (
     <div style={containerStyle} ref={mapContainerRef}>
       <TransformWrapper 
-        onTransformed={(ref) => setTransformState(ref.state)}
+        onTransformed={(ref) => {
+          // Update transform state
+          setTransformState(ref.state);
+          
+          // Use a small timeout to let the transform complete before adjusting tooltips
+          // This ensures tooltips are updated after the transform is done
+          setTimeout(() => {
+            // Get all pin elements with tooltips
+            const pinElements = document.querySelectorAll('.pin-wrapper, .icon-only-pin-wrapper');
+            
+            // Calculate the new offset based on current zoom level
+            const newOffset = getDynamicTooltipOffset();
+            
+            // Update each tooltip's offset
+            pinElements.forEach(el => {
+              if (el._tippy) {
+                el._tippy.setProps({ 
+                  offset: newOffset,
+                  distance: Math.max(5, Math.round(6 * ref.state.scale))
+                });
+              }
+            });
+          }, 10);
+        }}
         limitToBounds={false}
         // Disable panning when dragging a pin
         panning={{ disabled: isDraggingRef.current }}
@@ -299,19 +346,21 @@ const MapView = ({
               // Calculate initial position based on stored percentages
               const initialLeft = pin.x * 100;
               const initialTop = pin.y * 100;
+              const isIconOnly = pin.displayType === 'icon-only';
 
               return (
                 <div
                   key={pin._id || index}
-                  className="pin-wrapper"
+                  // Conditionally apply the correct wrapper class for hover effects
+                  className={isIconOnly ? "icon-only-pin-wrapper" : "pin-wrapper"}
                   style={{
                     position: 'absolute',
                     left: `${initialLeft}%`,
                     top: `${initialTop}%`,
-                    width: `${pinWidth}px`,
-                    height: `${pinHeight}px`,
-                    transform: 'translate(-50%, -100%)', // Center horizontally, align bottom with position
-                    cursor: pinsLocked ? 'pointer' : 'grab', // Use grab cursor for unlocked pins
+                    // Adjust size for icon-only pins if needed, otherwise use default
+                    width: isIconOnly ? '20px' : `${pinWidth}px`, // Example: smaller width for icon-only
+                    height: isIconOnly ? '20px' : `${pinHeight}px`, // Example: smaller height for icon-only
+                    cursor: pinsLocked ? 'pointer' : 'grab',
                     zIndex: 5,
                   }}
                   data-pin-id={pin._id}
@@ -322,9 +371,13 @@ const MapView = ({
                         const title = pin.article?.title || 'Linked Article';
                         tippy(node, {
                           content: title,
-                          delay: [300, 0],
-                          placement: 'top',
+                          delay: 0, // Set delay to 0 for instant appearance
+                          animation: false, // Disable animation
+                          placement: 'top', // Keep top placement
                           arrow: true,
+                          offset: getDynamicTooltipOffset(), // Use dynamic offset based on zoom level
+                          distance: Math.max(5, Math.round(6 * transformState.scale)), // Reduced multiplier (from 10)
+                          theme: 'map-pin-tooltip', // Apply custom theme
                           // Hide on mousedown to prevent issues during drag/click
                           hideOnClick: false, // We'll manage hide manually
                           trigger: 'mouseenter focus', // Standard triggers

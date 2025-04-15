@@ -136,27 +136,54 @@ const PinEditModal = ({
     // Determine which icon to show
     const IconComponent = FaIcons[selectedIcon] || FaIcons.FaHome;
     const shapePath = PIN_SHAPES[selectedShape] || PIN_SHAPES.pin;
+    const pinColor = selectedColor; // Use the state variable for color
     
+    // Handle icon-only case separately (no SVG shape)
+    if (displayType === 'icon-only') {
+      return (
+        <div className="pin-preview icon-only-pin-preview">
+          <div style={{ 
+            backgroundColor: pinColor,
+            padding: '5px', // Adjust padding for preview size
+            borderRadius: '50%',
+            border: '2px solid #fff', // White border like map version
+            boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            width: '30px', // Adjust size for preview
+            height: '30px'
+          }}>
+            <IconComponent color="#fff" size="1.2em" />
+          </div>
+        </div>
+      );
+    }
+    
+    // Render the SVG shape for pin+icon or hide-icon
     return (
       <div className="pin-preview">
-        {displayType !== 'icon-only' && (
-          <div className="pin-shape" style={{ color: selectedColor }}>
-            <svg width="40" height="40" viewBox="0 0 20 30" xmlns="http://www.w3.org/2000/svg">
-              <path d={shapePath} fill={selectedColor} stroke="#fff" strokeWidth="1"/>
-            </svg>
-          </div>
-        )}
-        {displayType !== 'hide-icon' && (
-          <div className={`pin-icon ${displayType === 'icon-only' ? 'icon-only' : ''}`}
-               style={{ 
-                 top: selectedShape === 'pin' ? '-5px' : '5px',
-                 left: '50%',
-                 transform: 'translateX(-50%)',
-                 backgroundColor: displayType === 'icon-only' ? selectedColor : 'rgba(0, 0, 0, 0.5)',
-               }}>
-            <IconComponent size={displayType === 'icon-only' ? '1.5em' : '1em'} color="#fff" />
-          </div>
-        )}
+        <div className="pin-shape" style={{ width: '40px', height: '60px' }}> {/* Increased size */} 
+          <svg width="100%" height="100%" viewBox="0 0 20 30" xmlns="http://www.w3.org/2000/svg" 
+            style={{
+              filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.5))',
+              overflow: 'visible' // Match MapView style
+            }}>
+            {/* Black Outer Stroke */}
+            <path d={shapePath} fill="none" stroke="#000000" strokeWidth="3" strokeLinejoin="round"/>
+            {/* White Inner Stroke + Fill */}
+            <path d={shapePath} fill={pinColor} stroke="#FFFFFF" strokeWidth="1.5" strokeLinejoin="round"/>
+            
+            {/* Icon embedded inside SVG using foreignObject */}
+            {displayType !== 'hide-icon' && (
+              <foreignObject x="3" y="3" width="14" height="14"> 
+                <div xmlns="http://www.w3.org/1999/xhtml" style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <IconComponent size="90%" color="#fff" />
+                </div>
+              </foreignObject>
+            )}
+          </svg>
+        </div>
       </div>
     );
   };
