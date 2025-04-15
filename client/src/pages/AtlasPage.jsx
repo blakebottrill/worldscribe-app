@@ -356,6 +356,34 @@ const AtlasPage = () => {
         coords: linkTargetPinCoords // Will be null if updating existing
       };
 
+      // If we have a specific pin we're updating (not creating a new one)
+      if (linkTargetPinId) {
+        // Fetch the current pin data from the map if available via map.pins
+        const mapData = queryClient.getQueryData(['map', selectedMap._id]);
+        const existingPin = mapData?.pins?.find(p => p._id === linkTargetPinId);
+
+        // For existing pins, we need to include the icon update
+        updatePinDetailsMutation.mutate({
+          mapId: selectedMap._id,
+          pinId: linkTargetPinId,
+          pinUpdatePayload: {
+            // Adopt the article's icon
+            icon: article.icon || 'FaHome',
+            iconId: article.iconId || `icon_${Date.now()}`,
+            // Keep existing display settings or use defaults
+            shape: existingPin?.shape || 'pin',
+            color: existingPin?.color || '#dc3545',
+            displayType: existingPin?.displayType || 'pin+icon',
+            // Include articleId for reference
+            articleId: article._id,
+            // Include previous icon data for comparison
+            previousIcon: existingPin?.icon || null,
+            previousIconId: existingPin?.iconId || null
+          }
+        });
+      }
+
+      // Always update the article link
       upsertPinLinkMutation.mutate(mutationPayload);
 
       // Reset state after initiating mutation
