@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 // Remove ArticleLinkModal import if not used directly in form submission logic
 // import ArticleLinkModal from '../common/ArticleLinkModal';
 import { FaSpinner } from 'react-icons/fa'; // For loading state

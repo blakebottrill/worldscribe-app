@@ -3,35 +3,49 @@
   align-items: center;
   margin-bottom: 1.5rem; /* Space below title area */
   margin-top: 1rem; /* Space above title area */
+  /* Add bottom border */
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
 }
 
 .icon-select-button {
-  background: none;
-  border: none;
-  padding: 0.25rem;
+  background: transparent; /* Use transparent bg */
+  border: 1px solid transparent; /* Start with transparent border */
+  padding: 0.5rem; /* Increase padding */
   margin-right: 0.75rem;
   cursor: pointer;
-  color: var(--text-color-secondary);
-  border-radius: 4px;
+  color: var(--text-secondary); /* Use secondary text color */
+  border-radius: 6px; /* Consistent radius */
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 .icon-select-button:hover {
-  color: var(--text-color-primary);
-  background-color: var(--button-hover-bg);
+  color: var(--accent-blue); /* Keep Accent blue on hover */
+  background-color: rgba(102, 204, 255, 0.1); /* Subtle blue background */
+  border-color: var(--accent-blue);
+}
+
+.icon-select-button svg {
+  width: 28px; /* Larger icon */
+  height: 28px;
 }
 
 .title-input {
-  flex-grow: 1; 
-  font-size: 1.8em;
-  font-weight: bold;
+  flex-grow: 1;
+  font-size: 2em; /* Larger title */
+  font-weight: 600; /* Bolder title */
   border: none;
   outline: none;
   padding: 0.25em 0;
-  background-color: transparent; /* Inherit background */
-  color: var(--text-color-primary); /* Inherit text color */
+  background-color: transparent;
+  color: var(--text-primary); /* Use primary text */
+}
+
+.title-input::placeholder {
+  color: var(--text-muted);
 }
 
 .tags-input-area {
@@ -51,75 +65,117 @@
 }
 
 .action-buttons-area {
-  margin-top: 20px; 
-  display: flex; 
+  margin-top: 1.5rem;
+  display: flex;
   justify-content: flex-end;
+  gap: 0.75rem; /* Space between buttons */
 }
 
+/* Action Buttons inherit default blue style */
+/* Delete button override is handled globally now */
+/*
 .action-buttons-area .delete-button {
-  background-color: #f8d7da; /* Light red */
-  border-color: #f5c2c7;
-  color: #842029; /* Dark red */
+  border-color: #ff6b6b;
+  color: #ff6b6b;
 }
+
 .action-buttons-area .delete-button:hover {
-  background-color: #f1aeb5;
-  border-color: #f1aeb5;
+  background-color: rgba(255, 107, 107, 0.2);
+  color: #ff8080;
+  border-color: #ff8080;
+  box-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
 }
+*/
 
 /* --- Tag Input --- */
 .tags-section {
-  margin-top: 1rem; /* Adjusted margin */
-  margin-bottom: 1rem;
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
 }
 
-.tags-container {
+.tags-section label {
+  /* Style the label if needed, e.g., make it bolder or use secondary text */
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.tags-input-container {
+  /* Container for input and tags list */
+  background-color: var(--surface-color); /* Use surface color */
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem; /* Spacing between tags */
-  padding-top: 0.5rem; /* Space above tags */
+  gap: 0.5rem;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.tags-input-container:focus-within {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 8px var(--glow-blue);
+}
+
+.tags-list {
+  display: contents; /* Allows tags to participate in flex wrap */
 }
 
 .tag-item {
-  display: inline-flex; /* Use flex to align icon, text, and button */
+  display: inline-flex;
   align-items: center;
-  background-color: #e9ecef; /* Light grey background like the image */
-  color: #495057; /* Darker text color */
-  padding: 0.3rem 0.6rem; /* Padding around content */
-  border-radius: 1rem; /* Rounded corners */
+  /* Use BLUE accent background */
+  background-color: rgba(102, 204, 255, 0.15); /* Blue accent bg */
+  color: var(--accent-blue); /* Blue accent text */
+  padding: 0.3rem 0.7rem;
+  border-radius: 1rem;
   font-size: 0.85em;
-  cursor: default; /* Indicate it's not directly clickable */
+  font-weight: 500;
 }
 
 .tag-item svg {
-  /* Style for the FaTag icon */
   margin-right: 0.3rem;
-  color: #6c757d; /* Slightly muted icon color */
+  fill: currentColor; /* Use tag color (blue) */
+  width: 14px;
+  height: 14px;
 }
 
 .tag-item span {
-  /* Style for the tag text */
   margin-right: 0.4rem;
 }
 
 .remove-tag-button {
   background: none;
   border: none;
-  color: #6c757d; /* Muted color for the 'x' */
+  color: var(--accent-blue); /* Match tag color (blue) */
+  opacity: 0.7;
   cursor: pointer;
-  font-size: 1.1em; /* Make 'x' slightly larger */
-  line-height: 1; /* Ensure proper vertical alignment */
-  padding: 0 0.2rem; /* Small padding for click area */
-  margin-left: auto; /* Pushes button to the right if needed, though flex gap helps */
+  font-size: 1.1em;
+  line-height: 1;
+  padding: 0 0.2rem;
+  transition: color 0.2s ease, opacity 0.2s ease;
 }
 
 .remove-tag-button:hover {
-  color: #dc3545; /* Red color on hover */
+  color: #ff6b6b; /* Keep Red for removal */
+  opacity: 1;
 }
 
-#tag-input:focus {
+/* The actual input field within the container */
+#tag-input {
+  flex-grow: 1;
+  border: none;
   outline: none;
-  border-color: #ced4da; /* Optional: Keep a subtle border color on focus or remove */
-  box-shadow: none; /* Remove any default box-shadow focus indicators */
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.9em;
+  padding: 0.2rem 0; /* Minimal padding */
+  min-width: 100px; /* Ensure it doesn't collapse too much */
+}
+
+#tag-input::placeholder {
+  color: var(--text-muted);
 }
 
 /* --- Tiptap Editor --- */
@@ -136,7 +192,7 @@
 .tiptap-editor > p.is-empty:first-child:last-child::before {
   content: attr(data-placeholder);
   float: left;
-  color: #adb5bd; /* Placeholder text color */
+  color: var(--text-muted); /* Use muted text color */
   pointer-events: none;
   height: 0;
 } 

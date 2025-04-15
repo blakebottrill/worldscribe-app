@@ -1,7 +1,7 @@
 /* client/src/components/wiki/ArticleView.css */
 
 .article-view-container {
-  /* Styles for the main view container if needed */
+  padding: 1rem; /* Add some padding around the view */
 }
 
 .article-header {
@@ -10,61 +10,83 @@
   align-items: center;
   margin-bottom: 1.5rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color); /* Use dark border */
 }
 
 .article-header h2 {
   margin: 0;
+  color: var(--text-primary); /* Ensure header color */
+  font-size: 1.8em; /* Match editor title size */
+  font-weight: 600; /* Match editor title weight */
 }
 
+.article-actions {
+  /* Container for buttons like edit/delete */
+  display: flex;
+  gap: 0.75rem;
+}
+
+/* Let buttons inherit global styles */
+/* Delete button style is handled globally */
+/*
 .article-actions .delete-button {
-  background-color: #f8d7da; /* Light red */
-  border-color: #f5c2c7;
-  color: #842029; /* Dark red */
+  border-color: #ff6b6b;
+  color: #ff6b6b;
 }
 .article-actions .delete-button:hover {
-  background-color: #f1aeb5;
-  border-color: #f1aeb5;
+  background-color: rgba(255, 107, 107, 0.2);
+  color: #ff8080;
+  border-color: #ff8080;
+  box-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
 }
+*/
 
 .article-body {
-  margin-bottom: 2rem; /* Space below body content */
+  margin-bottom: 2rem;
+  /* Ensure rendered markdown content uses theme colors */
+  color: var(--text-primary);
+}
+
+.article-body .tiptap-rendered-content {
+  /* Specific styles for rendered content if needed */
 }
 
 .article-tags-container {
   margin-top: 1.5rem;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem; /* Space between tags */
+  gap: 0.75rem; /* Increased gap */
 }
 
 .tag-pill {
-  display: inline-flex; /* Use inline-flex for icon alignment */
+  display: inline-flex;
   align-items: center;
-  background-color: #e9ecef; /* Light gray background */
-  color: var(--text-color-secondary);
-  padding: 0.25rem 0.75rem;
-  border-radius: 50rem; /* Make it pill-shaped */
-  font-size: 0.85rem;
+  /* Use BLUE accent tag style */
+  background-color: rgba(102, 204, 255, 0.15);
+  color: var(--accent-blue);
+  padding: 0.3rem 0.7rem;
+  border-radius: 1rem;
+  font-size: 0.85em;
   font-weight: 500;
   line-height: 1.5;
-  cursor: default; /* Not clickable for now */
 }
 
 .tag-icon {
   margin-right: 0.35rem;
-  /* Vertically align icon slightly better if needed */
-  vertical-align: middle; 
+  fill: currentColor; /* Use tag pill color (blue) */
+  width: 14px;
+  height: 14px;
+  vertical-align: middle;
   position: relative;
-  top: -1px; 
+  top: -1px;
 }
 
 .article-metadata {
   margin-top: 2rem;
   padding-top: 1rem;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--border-color); /* Use dark border */
   font-size: 0.8rem;
-  color: var(--text-color-secondary);
+  color: var(--text-muted); /* Use muted text color */
   display: flex;
   justify-content: space-between;
 } 

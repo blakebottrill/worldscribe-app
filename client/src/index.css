@@ -1,21 +1,32 @@
 :root {
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  /* Primary colors for backgrounds and emphasis */
+  --background-color: rgba(20, 20, 20, 0.95);
+  --surface-color: rgba(40, 40, 40, 0.85);
+  --accent-purple: #a66cff;   /* Neon purple for glow/highlights */
+  --accent-blue: #66ccff;     /* Neon blue for complementary highlights */
+
+  /* Text colors */
+  --text-primary: #eee;
+  --text-secondary: #aaa;
+  --text-muted: #777;
+
+  /* Border / shadow colors */
+  --shadow-color: rgba(0, 0, 0, 0.5);
+  --glow-purple: rgba(166, 108, 255, 0.6);
+  --glow-blue: rgba(102, 204, 255, 0.6);
+
+  /* Additional accent and interaction */
+  --hover-background: rgba(102, 204, 255, 0.15);
+
+  /* Sidebar specific */
+  --sidebar-bg: var(--surface-color); /* Use surface color for sidebar */
+  --sidebar-width: 240px;
+  --border-color: #555; /* Darker border for elements */
+
+  /* Font */
+  font-family: 'Inter', sans-serif;
   line-height: 1.6;
   font-weight: 400;
-
-  /* Light Theme Color Palette */
-  --sidebar-bg: #e9ecef;
-  --sidebar-width: 240px;
-  --text-color-primary: #212529;       /* Dark gray for main text */
-  --text-color-secondary: #6c757d;    /* Lighter gray for secondary text */
-  --background-color-main: #f8f9fa; /* Very light gray background */
-  --border-color: #dee2e6;          /* Light gray for borders */
-  --link-color: #0d6efd;             /* Standard blue link */
-  --link-hover-color: #0a58ca;       /* Darker blue link hover */
-  --button-bg: #fff;
-  --button-hover-bg: #f1f3f5;
-  --input-bg: #fff;
-  --input-border: var(--border-color);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -24,10 +35,13 @@
 }
 
 body {
-  margin: 0;
-  background-color: var(--background-color-main);
-  color: var(--text-color-primary);
+  font-family: 'Inter', sans-serif;
   font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background-color: var(--background-color);
+  margin: 0;
+  padding: 0; /* Added padding reset */
 }
 
 #root {
@@ -43,35 +57,43 @@ h1 {
 
 a {
   font-weight: 500;
-  color: var(--link-color);
-  text-decoration: inherit;
+  color: var(--accent-blue);
+  text-decoration: none; /* Remove default underline */
 }
 a:hover {
-  color: var(--link-hover-color);
+  color: var(--accent-blue); /* Keep color consistent */
+  text-decoration: underline; /* Add underline on hover */
 }
 
 button {
-  border-radius: 0.375rem;
-  border: 1px solid var(--border-color);
-  padding: 0.5em 1em;
+  padding: 8px 16px;
+  background-color: transparent;
+  /* Default border to blue */
+  border: 1px solid var(--accent-blue);
+  /* Keep text primary */
+  color: var(--text-primary);
+  border-radius: 8px;
+  transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  cursor: pointer;
+  font-family: inherit;
   font-size: 0.9rem;
   font-weight: 500;
-  font-family: inherit;
-  background-color: var(--button-bg);
-  color: var(--text-color-primary);
-  cursor: pointer;
-  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
 }
+
 button:hover {
-  border-color: #adb5bd;
-  background-color: var(--button-hover-bg);
+  /* Use blue hover background */
+  background-color: var(--hover-background);
+  /* Use blue glow */
+  box-shadow: 0 0 10px var(--glow-blue);
+  /* Keep border blue */
+  border-color: var(--accent-blue);
 }
+
 button:focus,
 button:focus-visible {
-  /* Remove the default blue outline globally */
   outline: none;
-  /* Optionally add a subtle box-shadow for accessibility if desired, but removing outline per request */
-  /* box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.25); */ 
+  /* Use blue glow on focus */
+  box-shadow: 0 0 10px var(--glow-blue);
 }
 
 /* Remove conflicting global nav styles */
@@ -100,15 +122,26 @@ nav a:hover, nav button:hover {
 
 /* Base Input Styles */
 input[type="text"],
+input[type="search"], /* Added search type */
 textarea,
 select {
-   padding: 0.375rem 0.75rem;
-   font-size: 1rem;
-   border-radius: 0.25rem;
-   border: 1px solid var(--input-border);
-   background-color: var(--input-bg);
-   color: var(--text-color-primary);
-   box-sizing: border-box; /* Include padding and border in element's total width and height */
+  background: var(--surface-color);
+  border: 1px solid var(--border-color); /* Use dark border */
+  padding: 8px 12px; /* Adjusted padding */
+  color: var(--text-primary);
+  border-radius: 8px;
+  outline: none;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  /* Keep blue glow/border for inputs */
+  box-shadow: 0 0 8px var(--glow-blue);
+  border-color: var(--accent-blue);
 }
 
 /* Remove Markdown Rendering Styles (Handled by TipTap/Prose classes now) */
@@ -119,46 +152,24 @@ select {
 ...
 */
 
-/* Keep dark mode preference */
-@media (prefers-color-scheme: dark) {
-  .markdown-content code {
-    background-color: #333; /* Darker code background */
-  }
-  .markdown-content blockquote {
-    border-left-color: #555; 
-    color: #aaa;
-  }
-}
-
 /* Basic Styling for Tiptap content */
 /* Apply within .ProseMirror class (editor) and .tiptap-rendered-content (view) */
-.ProseMirror blockquote, 
+.ProseMirror blockquote,
 .tiptap-rendered-content blockquote {
   margin-left: 1em;
   padding-left: 1em;
-  border-left: 3px solid #ccc;
-  color: #888;
+  border-left: 3px solid var(--text-muted); /* Use muted text color for border */
+  color: var(--text-secondary); /* Use secondary text color */
 }
 
 .ProseMirror pre,
 .tiptap-rendered-content pre {
-  background: #f4f4f4;
+  background: var(--surface-color); /* Use surface color */
   border-radius: 0.5rem;
-  color: #333;
+  color: var(--text-primary); /* Use primary text color */
   font-family: 'JetBrainsMono', monospace;
   padding: 0.75rem 1rem;
-}
-
-/* Adjust dark mode styles */
-.ProseMirror blockquote,
-.tiptap-rendered-content blockquote {
-  border-left-color: #555;
-  color: #aaa;
-}
-.ProseMirror pre,
-.tiptap-rendered-content pre {
-  background: #333;
-  color: #eee;
+  border: 1px solid var(--border-color); /* Add subtle border */
 }
 
 /* Table Styles */
@@ -173,7 +184,7 @@ select {
 .ProseMirror td,
 .tiptap-rendered-content th,
 .tiptap-rendered-content td {
-  border: 1px solid #ccc; /* Light mode border */
+  border: 1px solid var(--border-color); /* Use dark border color */
   padding: 0.5em 0.75em;
   vertical-align: top;
 }
@@ -182,56 +193,40 @@ select {
 .tiptap-rendered-content th {
   font-weight: bold;
   text-align: left;
-  background-color: #f8f8f8; /* Light mode header bg */
+  background-color: rgba(255, 255, 255, 0.05); /* Slightly lighter surface for header */
 }
 
-/* Dark mode table borders */
-.ProseMirror th,
-.ProseMirror td,
-.tiptap-rendered-content th,
-.tiptap-rendered-content td {
-  border-color: #555; /* Darker border */
-}
-.ProseMirror th,
-.tiptap-rendered-content th {
-  background-color: #444; /* Darker header bg */
-}
-
-/* Update styles for Tiptap Mention Marks to be more general */
+/* Update styles for Tiptap Mention Marks */
 span[data-mention-id] {
-  color: #809fff; /* A slightly lighter blue for dark mode visibility */
+  color: var(--accent-blue); /* Use accent blue */
+  background-color: rgba(102, 204, 255, 0.1); /* Subtle blue background */
   cursor: pointer;
-  font-weight: 500; /* Optional: Make them slightly bolder */
-  padding: 1px 2px; /* Minimal padding */
-  border-radius: 3px;
+  font-weight: 500;
+  padding: 1px 4px; /* Adjusted padding */
+  border-radius: 4px; /* Slightly more rounded */
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 span[data-mention-id]:hover {
-  text-decoration: underline;
-  color: #a0bfff; /* Slightly lighter on hover */
+  text-decoration: none; /* Remove underline */
+  color: #fff; /* Brighter text on hover */
+  background-color: rgba(102, 204, 255, 0.3); /* Stronger blue background */
 }
 
-/* Column Layout Styles */
+/* Column Layout Styles - Update borders */
 .column-layout {
   display: flex;
-  gap: 1rem; /* Space between columns */
-  margin: 1rem 0; /* Space above/below layout */
-  border: 1px dashed #555; /* Optional: visualize layout bounds */
-  padding: 0.5rem;
+  gap: 1rem;
+  margin: 1rem 0;
+  /* border: 1px dashed var(--border-color); Optional: visualize layout bounds */
+  /* padding: 0.5rem; */
 }
 
 .column {
-  flex: 1; /* Distribute space evenly */
-  min-width: 0; /* Prevent content overflow issues */
-  border: 1px dotted #444; /* Optional: visualize individual columns */
-  padding: 0.5rem;
-}
-
-/* Ensure images within columns don't overflow */
-.column img {
-  max-width: 100%;
-  height: auto; /* Maintain aspect ratio */
-  display: block; /* Optional: ensures proper block behavior */
+  flex: 1;
+  min-width: 0;
+  /* border: 1px dotted var(--border-color); Optional: visualize individual columns */
+  /* padding: 0.5rem; */
 }
 
 /* Auto-save spinner */
@@ -247,4 +242,42 @@ span[data-mention-id]:hover {
 /* General Loading Spinner */
 .spinner {
   animation: spin 1.5s linear infinite; /* Reuse spin animation */
+}
+
+/* Add Glassmorphism Style */
+.glass {
+  background: var(--surface-color);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px); /* Safari support */
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1); /* Subtle border for definition */
+  /* Apply dual glow */
+  box-shadow: 0 0 20px var(--glow-purple), 0 0 20px var(--glow-blue);
+  padding: 20px; /* Increased padding */
+}
+
+/* Ensure spinner colors fit the theme */
+.spin-icon, .spinner {
+  color: var(--accent-purple); /* Use accent color for spinners */
+  /* animation remains the same */
+}
+
+/* Destructive Action Button Style */
+button.delete-button {
+  background-color: #cc3333; /* Darker red background */
+  border: 1px solid #cc3333; /* Red border */
+  color: var(--text-primary); /* Keep text primary */
+}
+
+button.delete-button:hover {
+  background-color: #e64d4d; /* Lighter red on hover */
+  border-color: #e64d4d;
+  color: var(--text-primary);
+  box-shadow: 0 0 10px rgba(255, 107, 107, 0.7); /* Red glow */
+}
+
+button.delete-button:focus,
+button.delete-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 10px rgba(255, 107, 107, 0.7); /* Red glow on focus */
 }

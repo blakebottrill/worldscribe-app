@@ -4,85 +4,106 @@
   list-style: none;
   padding: 0;
   margin: 0;
+  /* Add a container background or keep transparent */
+  /* background-color: var(--surface-color); */
+  /* border-radius: 8px; */ /* Optional: round corners if background is added */
 }
 
 .article-list-item {
-  /* No border needed directly on li */
+  /* Styles for list item container if needed */
 }
 
 .article-list-button {
-  display: flex; /* Use flex for layout */
-  flex-direction: column; /* Stack title/meta vertically */
-  align-items: flex-start; /* Align text left */
+  display: flex;
+  /* Keep direction column for now, maybe change later */
+  flex-direction: column;
+  align-items: flex-start;
   width: 100%;
-  padding: 0.75rem 1rem; /* Adjust padding */
+  padding: 0.8rem 1rem; /* Adjusted padding */
   border: none;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color); /* Use dark border */
   background-color: transparent;
   cursor: pointer;
   text-align: left;
   font-family: inherit;
-  border-radius: 0; /* Remove button radius */
-  transition: background-color 0.15s ease-in-out;
-  /* Remove default focus outline globally for these buttons */
+  border-radius: 0;
+  transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
 }
+
+/* Remove default focus styles */
 .article-list-button:focus,
 .article-list-button:focus-visible {
   outline: none;
-  box-shadow: none; 
+  box-shadow: none;
 }
 
 .article-list-item:last-child .article-list-button {
-  border-bottom: none; /* Remove border for last item */
+  border-bottom: none;
 }
 
 .article-list-item .article-list-button:hover {
-  background-color: var(--button-hover-bg);
+  background-color: rgba(255, 255, 255, 0.05); /* Subtle hover */
 }
 
 .article-list-item.selected .article-list-button {
-  /* Style for selected state (background/color) */
-  background-color: #4b5563; 
-  color: white; 
-  /* No need for outline: none here anymore */
+  background-color: var(--hover-background); /* Use blueish background */
+  color: var(--text-primary);
+  box-shadow: inset 3px 0 0 0 var(--accent-blue); /* Use BLUE inset border */
 }
 
-/* Ensure nested elements inherit the white color when selected */
+/* Adjust colors for selected state */
 .article-list-item.selected .article-list-button .article-title,
 .article-list-item.selected .article-list-button .article-list-icon,
 .article-list-item.selected .article-list-button .article-tags,
 .article-list-item.selected .article-list-button .article-date {
-  color: white;
+  color: var(--text-primary); /* Ensure text remains readable */
+}
+
+/* Style the icon differently when selected */
+.article-list-item.selected .article-list-button .article-list-icon {
+  color: var(--accent-blue); /* Use BLUE accent color */
 }
 
 .article-list-item-content {
   display: flex;
   align-items: center;
+  margin-bottom: 0.25rem; /* Add space below icon/title row */
 }
 
 .article-list-icon {
-  margin-right: 0.5rem; /* Space between icon and title */
-  color: var(--text-color-secondary); /* Icon color */
-  display: inline-flex; /* Align icon vertically */
+  margin-right: 0.75rem; /* Increased space */
+  color: var(--text-secondary); /* Use secondary text color */
+  display: inline-flex;
   align-items: center;
+  transition: color 0.2s ease-in-out;
 }
 
 .article-title {
-  font-size: 1rem;
+  font-size: 1.05rem; /* Slightly larger */
   font-weight: 500;
-  color: var(--text-color-primary);
-  margin-bottom: 0; /* Remove margin if icon is next to it */
+  color: var(--text-primary); /* Use primary text */
+  margin-bottom: 0;
+  transition: color 0.2s ease-in-out;
+}
+
+.article-meta {
+  /* Container for tags and date */
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.1rem;
 }
 
 .article-tags,
 .article-date {
   font-size: 0.8rem;
-  color: var(--text-color-secondary);
-  display: block; /* Ensure they take own line if needed */
+  color: var(--text-muted); /* Use muted color */
+  display: block;
+  transition: color 0.2s ease-in-out;
 }
 
 .no-articles-message {
-  padding: 1rem;
-  color: var(--text-color-secondary);
+  padding: 1.5rem 1rem; /* Increased padding */
+  color: var(--text-muted); /* Use muted color */
   text-align: center;
+  font-style: italic;
 } 

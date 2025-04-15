@@ -466,11 +466,27 @@ const WikiPage = () => {
   // Handler for modal selection (for editor mentions)
   const handleEditorModalSelect = (selectedArticle) => {
     if (editorInstance && editorLinkRange && selectedArticle) {
-      const url = `/wiki#${selectedArticle._id}`; // Consider using navigate state instead of hash
+      // Remove the @ character first
       editorInstance.chain().focus()
-        .extendMarkRange('link')
-        .setLink({ href: url, 'data-mention-id': selectedArticle._id })
-        .insertContent(' ') 
+        .deleteRange(editorLinkRange)
+        .run();
+        
+      // Insert the mention mark with the article ID and title
+      editorInstance.chain().focus()
+        .insertContent({
+          type: 'text',
+          text: selectedArticle.title,
+          marks: [
+            {
+              type: 'mentionMark',
+              attrs: {
+                id: selectedArticle._id,
+                label: selectedArticle.title
+              }
+            }
+          ]
+        })
+        .insertContent(' ') // Add a space after the mention
         .run();
     }
     setShowEditorLinkModal(false);

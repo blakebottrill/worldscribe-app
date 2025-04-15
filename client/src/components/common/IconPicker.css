@@ -4,18 +4,27 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.7); /* Slightly darker backdrop */
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000; /* Ensure it\'s on top */
+  backdrop-filter: blur(5px); /* Add blur to backdrop */
+  -webkit-backdrop-filter: blur(5px); /* Safari support */
 }
 
 .icon-picker-modal-content {
-  background-color: var(--background-color-main, #fff);
-  padding: 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  /* Apply glassmorphism */
+  background: var(--surface-color);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  /* Keep dual glow */
+  box-shadow: 0 0 20px var(--glow-purple), 0 0 20px var(--glow-blue);
+  padding: 20px;
+
+  color: var(--text-primary); /* Ensure text color is set */
   max-width: 500px;
   width: 90%;
   max-height: 80vh;
@@ -25,9 +34,10 @@
 
 .icon-picker-modal-content .modal-title {
   margin-top: 0;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem; /* Increased margin */
   text-align: center;
-  color: var(--text-color-primary);
+  color: var(--text-primary); /* Use primary text color */
+  font-weight: 500; /* Slightly bolder */
 }
 
 .icon-groups-container {
@@ -50,9 +60,11 @@
   margin-bottom: 0.75rem;
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--text-color-secondary);
-  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary); /* Use secondary text color */
+  border-bottom: 1px solid var(--border-color); /* Use dark border */
   padding-bottom: 0.25rem;
+  text-transform: uppercase; /* Style title */
+  letter-spacing: 0.5px; /* Style title */
 }
 
 .icon-grid {
@@ -64,23 +76,38 @@
 }
 
 .icon-button {
-  background-color: var(--button-hover-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
+  background-color: transparent; /* Transparent background */
+  border: 1px solid var(--border-color); /* Use dark border */
+  border-radius: 6px; /* Slightly more rounded */
   padding: 0.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  aspect-ratio: 1 / 1; /* Make buttons square */
-  transition: background-color 0.15s ease-in-out;
+  aspect-ratio: 1 / 1;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  color: var(--text-secondary); /* Default icon color */
+}
+
+.icon-button svg { /* Target SVG within button */
+  width: 24px;
+  height: 24px;
+  fill: currentColor; /* Use button's color */
 }
 
 .icon-button:hover {
-  background-color: #dbeafe; /* Highlight on hover */
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: var(--accent-blue); /* Keep blue accent */
+  box-shadow: 0 0 5px var(--glow-blue); /* Keep blue glow */
+  color: var(--accent-blue);
 }
 
 .icon-picker-modal-content .close-button {
+  /* Inherit general button styles defined in index.css */
   margin-top: 1rem;
   align-self: flex-end;
+  /* Remove specific styles if they conflict */
+  /* background-color: transparent; */
+  /* border: 1px solid var(--accent-purple); */
+  /* color: var(--text-primary); */
 } 

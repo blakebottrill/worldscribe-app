@@ -3,13 +3,15 @@
   display: flex;
   height: 100vh;
   overflow: hidden; /* Prevent scrolling on the main layout */
+  background-color: var(--background-color); /* Ensure base background is set */
 }
 
 .main-content {
   flex-grow: 1;
   overflow-y: auto; /* Allow scrolling within the main content area */
-  /* Add padding later if needed, pages should manage their own */
-  background-color: var(--background-color-main, #f8f9fa); /* Light background */
+  /* Keep background transparent or use base; pages/components manage surface */
+  /* background-color: var(--background-color); */
+  padding: 1.5rem; /* Add some base padding */
 }
 
 /* Define CSS variables for colors in index.css or here */

@@ -1,0 +1,53 @@
+/* client/src/components/timeline/TimelineEventList.css */
+
+.timeline-event-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.timeline-event-item {
+  border: 1px solid var(--border-color);
+  background-color: rgba(0, 0, 0, 0.1); /* Subtle background */
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+}
+
+.timeline-event-item h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.timeline-event-item p {
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.timeline-event-item p strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.timeline-event-item .related-article {
+  font-style: italic;
+  margin-top: 0.75rem;
+}
+
+.timeline-event-item .event-actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.75rem;
+}
+
+/* Buttons inherit global styles */
+/* Delete button uses .delete-button class handled globally */
+
+.no-events-message {
+  padding: 1.5rem 1rem;
+  color: var(--text-muted);
+  text-align: center;
+  font-style: italic;
+} 

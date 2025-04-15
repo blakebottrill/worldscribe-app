@@ -421,10 +421,11 @@ const AtlasPage = () => {
             </button>
           )}
           {selectedMap && !showUploadForm && (
-            <button 
-              onClick={() => handleDeleteMap(selectedMap._id)} 
+            <button
+              onClick={() => handleDeleteMap(selectedMap._id)}
               disabled={deleteMapMutation.isPending} // Disable button while deleting
-              style={{marginRight: '10px', backgroundColor: '#dc3545', color: 'white'}}
+              className="delete-button"
+              style={{marginRight: '10px'}} // Keep margin
             >
               {deleteMapMutation.isPending ? <FaSpinner className="spinner"/> : 'Delete Map'}
             </button>
