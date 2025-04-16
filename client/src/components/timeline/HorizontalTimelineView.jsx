@@ -2,161 +2,257 @@ import React from 'react';
 import TimelineItem from './TimelineItem';
 import './HorizontalTimelineView.css';
 
-// Placeholder data structure for an event
-// const sampleEvent = {
-//   _id: '1',
-//   title: 'Event Title',
-//   startDate: '2024-01-01', // Assuming YYYY-MM-DD for now
-//   endDate: '2024-01-15',
-//   icon: 'FaLandmark', // Example icon name
-//   color: '#3b82f6', // Example color
-//   linkedArticle: 'articleId123' 
-// };
+// Helper function to calculate the day number since Year 1, Month 0, Day 1
+// Assumes month is 0-indexed, day is 1-indexed
+const dateToDayNumber = (dateObj, settings, getDaysInMonthFunc) => {
+  if (
+    !dateObj ||
+    dateObj.year === undefined ||
+    dateObj.month === undefined ||
+    dateObj.day === undefined ||
+    !settings ||
+    !getDaysInMonthFunc ||
+    dateObj.month < 0 ||
+    dateObj.month >= settings.monthNames.length ||
+    dateObj.day < 1
+  ) {
+    return null; // Indicate invalid input
+  }
 
-// Helper to safely parse date strings (returns null on invalid)
-const safeParseDate = (dateString) => {
-  if (!dateString) return null;
-  const date = new Date(dateString);
-  // Check if the date is valid (Date object represents an actual date)
-  return isNaN(date.getTime()) ? null : date;
+  let totalDays = 0;
+  const targetYear = dateObj.year;
+  const targetMonth = dateObj.month;
+  const targetDay = dateObj.day;
+
+  // Basic handling for negative/zero years - treat as invalid for now
+  if (targetYear < 1) {
+    console.warn(
+      `Timeline does not support years before Year 1 (received ${targetYear}). Event will be ignored.`
+    );
+    return null;
+  }
+
+  // Add days for full years prior to the target year
+  for (let y = 1; y < targetYear; y++) {
+    let daysInYearY = 0;
+    for (let m = 0; m < settings.monthNames.length; m++) {
+      daysInYearY += getDaysInMonthFunc(m, y);
+    }
+    // Handle potential infinite loops or extremely large numbers if calculation is flawed
+    if (!Number.isFinite(daysInYearY)) {
+        console.error(`Calculation error: Non-finite days in year ${y}`);
+        return null;
+    }
+    totalDays += daysInYearY;
+     // Safety break for extremely large numbers to prevent browser freezing
+     if (totalDays > Number.MAX_SAFE_INTEGER / 2) {
+        console.warn(`Timeline calculation reached extreme values for year ${y}, clamping.`);
+        totalDays = Number.MAX_SAFE_INTEGER / 2; // Clamp to avoid overflow issues later
+        break; // Stop calculating further years
+     }
+  }
+
+  // Add days for full months prior to the target month in the target year
+  for (let m = 0; m < targetMonth; m++) {
+    const daysInMonthM = getDaysInMonthFunc(m, targetYear);
+     if (!Number.isFinite(daysInMonthM)) {
+        console.error(`Calculation error: Non-finite days in month ${m}, year ${targetYear}`);
+        return null;
+    }
+    totalDays += daysInMonthM;
+  }
+
+  // Add the day in the target month
+  // Ensure targetDay does not exceed days in the month
+  const daysInTargetMonth = getDaysInMonthFunc(targetMonth, targetYear);
+  if (targetDay > daysInTargetMonth) {
+      console.warn(`Day ${targetDay} exceeds days in month ${targetMonth} of year ${targetYear}. Clamping day.`);
+      totalDays += daysInTargetMonth;
+  } else {
+       totalDays += targetDay;
+  }
+
+
+  if (!Number.isFinite(totalDays)) {
+      console.error("Calculation error: Final totalDays is not finite.");
+      return null;
+  }
+
+  // Return 1 for the very first day (Year 1, Month 0, Day 1)
+  return totalDays > 0 ? totalDays : 1;
 };
 
-const HorizontalTimelineView = ({ events, onEventClick }) => {
+
+const HorizontalTimelineView = ({
+  events,
+  onEventClick,
+  formatDate, // Keep for display in TimelineItem
+  calendarSettings,
+  getDaysInMonth,
+}) => {
   if (!events || events.length === 0) {
     return <div className="timeline-view-empty">No timeline events yet.</div>;
   }
-
-  // Filter out events with invalid or missing start dates for range calculation
-  const validEvents = events
-    .map(e => ({ ...e, start: safeParseDate(e.startDate || e.dateString) }))
-    .filter(e => e.start)
-    .sort((a, b) => a.start.getTime() - b.start.getTime()); // Ensure sorted by start date
-
-  if (validEvents.length === 0) {
-    return <div className="timeline-view-empty">No events with valid dates found.</div>;
+  if (!calendarSettings || !getDaysInMonth) {
+      return <div className="timeline-view-empty">Calendar settings not available.</div>;
   }
 
-  // --- Calculate Date Range and Positioning --- 
-  const timestamps = validEvents.flatMap(e => {
-      // Use start date if end date is missing/invalid for range calculation
-      const end = safeParseDate(e.endDate) || e.start; 
-      return [e.start.getTime(), end.getTime()]; // Already filtered for valid start
-  });
-  
-  const minTimestamp = Math.min(...timestamps);
-  const maxTimestamp = Math.max(...timestamps);
-  const totalDuration = Math.max(maxTimestamp - minTimestamp, 1); 
+  // --- Process Events: Calculate Day Numbers ---
+  const processedEvents = events
+    .map((event) => {
+      const startDayNum = dateToDayNumber(
+        event.startDate,
+        calendarSettings,
+        getDaysInMonth
+      );
+      // Use startDate if endDate is missing or invalid
+      const endDateObj = event.endDate || event.startDate;
+      let endDayNum = dateToDayNumber(
+          endDateObj,
+          calendarSettings,
+          getDaysInMonth
+      );
 
-  // --- Lane Calculation for Overlaps --- 
-  const lanes = []; // Stores the end time of the last event in each lane
-  const eventLayouts = validEvents.map(event => {
-    const startDate = event.start; // Already parsed and validated
-    let endDate = safeParseDate(event.endDate) || startDate; 
-    if (endDate.getTime() < startDate.getTime()) endDate = startDate;
+      // Ensure endDayNum is valid and not before startDayNum
+      if (endDayNum === null || (startDayNum !== null && endDayNum < startDayNum)) {
+        endDayNum = startDayNum;
+      }
 
-    const startOffset = startDate.getTime() - minTimestamp;
-    const eventDuration = endDate.getTime() - startDate.getTime();
-    const minEventDuration = totalDuration * 0.001; 
-    const displayDuration = Math.max(eventDuration, minEventDuration);
+      return {
+        ...event, // Keep original event data
+        startDayNumber: startDayNum,
+        endDayNumber: endDayNum, // Use start if end is invalid/before start
+      };
+    })
+    // Filter out events where startDayNumber couldn't be calculated
+    .filter((event) => event.startDayNumber !== null);
+
+  // Rely on sorting from TimelinePage, but could re-sort here by dayNumber if needed
+
+  if (processedEvents.length === 0) {
+    return (
+      <div className="timeline-view-empty">
+        No events with valid dates found within the supported calendar range.
+      </div>
+    );
+  }
+
+  // --- Calculate Date Range (in Days) ---
+  const dayNumbers = processedEvents.flatMap((e) => [
+    e.startDayNumber,
+    e.endDayNumber,
+  ]);
+  const minDayNumber = Math.min(...dayNumbers);
+  const maxDayNumber = Math.max(...dayNumbers);
+  // Add 1 because span includes the start and end day
+  const totalDaySpan = maxDayNumber > minDayNumber ? (maxDayNumber - minDayNumber + 1) : 1;
+
+
+  // --- Lane Calculation (using Day Numbers) ---
+  const lanes = []; // Stores the end day number of the last event in each lane
+  const eventLayouts = processedEvents.map((event) => {
+    const startDay = event.startDayNumber;
+    const endDay = event.endDayNumber;
+
+    // Calculate start offset and duration in days
+    const startOffsetDays = startDay - minDayNumber;
+    // Duration includes start and end day, add 1
+    const eventDurationDays = endDay - startDay + 1;
+
+    // Ensure a minimum visual duration (e.g., 0.1% of total span or at least 1 day)
+    const minVisualDuration = Math.max(1, totalDaySpan * 0.001);
+    const displayDurationDays = Math.max(eventDurationDays, minVisualDuration);
 
     let assignedLane = -1;
-    // Find the first lane where this event fits
-    console.log(`Processing Event: ${event.title || event._id}, Start: ${startDate.toISOString()}, End: ${endDate.toISOString()}`);
+    // Find the first lane where this event fits (non-overlapping day numbers)
     for (let i = 0; i < lanes.length; i++) {
-      console.log(`  Checking Lane ${i}: Event Start (${startDate.getTime()}) >= Lane End (${lanes[i]}) ?`);
-      if (startDate.getTime() >= lanes[i]) { // If event starts after the last event in this lane ends
-        console.log(`    YES - Assigning to Lane ${i}. Updating Lane End to ${endDate.getTime()}`);
-        lanes[i] = endDate.getTime(); // Place it here, update lane's end time
-        assignedLane = i;
-        break;
-      }
-      console.log(`    NO - Event overlaps or starts before lane ${i} ends.`);
+      // Event starts after the last event in this lane ends
+       if (startDay > lanes[i]) {
+         lanes[i] = endDay; // Update lane's end day
+         assignedLane = i;
+         break;
+       }
     }
 
     // If no suitable lane found, create a new one
     if (assignedLane === -1) {
-      console.log(`  No suitable lane found. Creating New Lane ${lanes.length}. Setting Lane End to ${endDate.getTime()}`);
-      lanes.push(endDate.getTime());
+      lanes.push(endDay);
       assignedLane = lanes.length - 1;
     }
 
+    // Calculate style percentages based on day numbers
+    const calculatePercentage = (value, total) => (total > 1 ? (value / total) * 100 : 0);
+
+    const leftPercent = calculatePercentage(startOffsetDays, totalDaySpan);
+    // Ensure width doesn't exceed 100% if duration calculation has issues
+    const widthPercent = calculatePercentage(displayDurationDays, totalDaySpan);
+
     const style = {
-      left: `${(startOffset / totalDuration) * 100}%`,
-      width: `${(displayDuration / totalDuration) * 100}%`,
-      '--lane-index': assignedLane, // Pass lane index as CSS variable
+      left: `${leftPercent}%`,
+      width: `${Math.min(widthPercent, 100 - leftPercent)}%`, // Prevent overflow
+      '--lane-index': assignedLane,
     };
 
-    return { event, style }; // Return layout info
+    return { originalEvent: event, style }; // Pass the original event object
   });
 
   const totalLanes = lanes.length;
 
-  // --- Marker and Line Calculation --- 
-  const startYear = new Date(minTimestamp).getFullYear();
-  const endYear = new Date(maxTimestamp).getFullYear();
-  const yearSpan = endYear - startYear;
-
+  // --- Marker Calculation (Approximation for very large ranges) ---
   const markers = [];
-  const centuryLines = [];
-
-  // Determine marker interval based on total span
-  let yearInterval = 1;
-  if (yearSpan > 10000) yearInterval = 1000;
-  else if (yearSpan > 1000) yearInterval = 100;
-  else if (yearSpan > 200) yearInterval = 20;
-  else if (yearSpan > 50) yearInterval = 10;
-  else if (yearSpan > 10) yearInterval = 5;
-
-  // Function to calculate horizontal percentage
-  const getPercentage = (timestamp) => ((timestamp - minTimestamp) / totalDuration) * 100;
-
-  for (let year = Math.ceil(startYear / yearInterval) * yearInterval; year <= endYear; year += yearInterval) {
-    // Use start of the year for positioning
-    const yearTimestamp = new Date(year, 0, 1).getTime(); 
-    if (yearTimestamp >= minTimestamp && yearTimestamp <= maxTimestamp) {
+  // Basic markers at start/end for context, formatting needs original date
+   if (processedEvents.length > 0) {
+       const firstEvent = processedEvents[0];
+       const lastEvent = processedEvents[processedEvents.length - 1];
         markers.push({
-            year: year,
-            style: { left: `${getPercentage(yearTimestamp)}%` }
+            label: formatDate(firstEvent.startDate), // Use original date obj and formatter
+            position: 0,
         });
-    }
-  }
 
-  // Calculate Century Lines
-  const startCentury = Math.floor(startYear / 100) * 100;
-  const endCentury = Math.ceil(endYear / 100) * 100;
-  for (let year = startCentury; year <= endCentury; year += 100) {
-    const centuryTimestamp = new Date(year, 0, 1).getTime();
-    // Check if the calculated centuryTimestamp is within the actual event range
-    if (centuryTimestamp >= minTimestamp && centuryTimestamp <= maxTimestamp) { 
-      centuryLines.push({
-        year: year,
-        style: { left: `${getPercentage(centuryTimestamp)}%` }
-      });
-    }
-  }
+        // Add end marker only if different from start and timeline has span
+        if (totalDaySpan > 1 && lastEvent.startDayNumber > firstEvent.startDayNumber) {
+             markers.push({
+                label: formatDate(lastEvent.startDate), // Use original date obj
+                position: 100,
+             });
+        }
+   }
 
-  // --- Rendering ---
+  // TODO: Add intermediate markers. This is complex for large/custom calendars.
+  // Calculating intermediate year/century markers requires converting
+  // a specific year (e.g., 10000) back to a day number relative to the
+  // minDayNumber and totalDaySpan, using the dateToDayNumber logic.
+  // This is omitted for now to focus on core functionality.
+
+
   return (
-    <div className="timeline-view-container">
-      <div className="timeline-markers-area">
-        {markers.map(marker => (
-          <div key={marker.year} className="timeline-year-marker" style={marker.style}>
-            {marker.year}
-          </div>
+    <div className="timeline-container" style={{ '--total-lanes': totalLanes }}>
+      <div className="timeline-track">
+        {/* Render Event Items */}
+        {eventLayouts.map(({ originalEvent, style }, index) => (
+          <TimelineItem
+            key={originalEvent._id || `event-${index}`}
+            event={originalEvent}
+            style={style}
+            onClick={onEventClick}
+            formatDate={formatDate} // Use the passed formatter
+          />
         ))}
       </div>
-      <div className="timeline-track-area" style={{ '--total-lanes': totalLanes }}>
-        <div className="timeline-base-track"></div>
-        {centuryLines.map(line => (
-          <div key={line.year} className="timeline-century-line" style={line.style}></div>
-        ))}
-        {eventLayouts.map(({ event, style }) => (
-          <TimelineItem 
-            key={event._id}
-            event={event} 
-            style={style}
-            onClick={() => onEventClick(event)}
-          />
+
+      {/* Render Year Markers (Simplified) */} 
+      <div className="timeline-markers">
+        {markers.map((marker, index) => (
+          <div
+            key={`marker-${index}`}
+            className="timeline-marker" // Removed century class for now
+            style={{ left: `${marker.position}%` }}
+          >
+            {/* Adjust positioning based on percentage */} 
+            <span className="marker-label" style={{ transform: marker.position > 95 ? 'translateX(-100%)' : (marker.position < 5 ? 'translateX(0)' : 'translateX(-50%)')}}>
+                 {marker.label}
+             </span>
+          </div>
         ))}
       </div>
     </div>

@@ -1,15 +1,14 @@
 const TimelineEvent = require('../models/TimelineEvent');
 const Article = require('../models/Article'); // If linking articles
 
-// Placeholder functions - implement logic later
-
-// Get all events, populate linked article title
+// Get all events (no world filtering)
 exports.getAllEvents = async (req, res) => {
   try {
-    // TODO: Add user filtering
-    const events = await TimelineEvent.find()
-      .populate('article', 'title') // Populate title of linked article
-      .sort({ createdAt: 1 }); // Sort by creation date for now (can change later)
+    // Removed worldId query logic
+    const events = await TimelineEvent.find() // Fetch all events
+      .populate('article', 'title')
+      .sort({ 'startDate.year': 1, 'startDate.month': 1, 'startDate.day': 1 });
+      
     res.json(events);
   } catch (err) {
     console.error("Error fetching timeline events:", err);
@@ -17,96 +16,162 @@ exports.getAllEvents = async (req, res) => {
   }
 };
 
-// Create event
+// Create event (no world field)
 exports.createEvent = async (req, res) => {
-  // Expect articleId instead of articleTitle
-  const { eventName, dateString, description, articleId } = req.body;
+  console.log('[Controller] Received POST /api/timeline request body:', req.body);
+  
+  const { 
+    title, 
+    startDate, 
+    endDate, 
+    description, 
+    articleId, 
+    isAllDay, 
+    color, 
+    important 
+    // Removed world field from destructuring
+  } = req.body;
 
-  if (!eventName || !dateString) {
-    return res.status(400).json({ msg: 'Event Name and Date are required.' });
+  // Updated Validation Logic (removed world check)
+  let errors = {};
+  if (!title) errors.title = 'Title is required';
+  if (!startDate) {
+    errors.startDate = 'Start date is required';
+  } else {
+    if (startDate.year == null) errors.startDate = 'Start date year is required';
+    if (startDate.month == null) errors.startDate = 'Start date month is required';
+    if (startDate.day == null) errors.startDate = 'Start date day is required';
+  }
+  if (endDate && (endDate.year == null || endDate.month == null || endDate.day == null)) {
+      errors.endDate = 'End date must be complete (year, month, day) if provided';
   }
 
-  try {
-    // Remove article lookup by title
-    /* let articleId = null; ... */ 
+  if (Object.keys(errors).length > 0) {
+    console.log('[Controller] Validation failed:', errors);
+    return res.status(400).json({ msg: 'Validation failed', errors }); 
+  }
+  
+  const effectiveEndDate = endDate && endDate.year !== undefined && endDate.month !== undefined && endDate.day !== undefined 
+                           ? endDate 
+                           : startDate;
 
+  try {
     const newEvent = new TimelineEvent({
-      eventName,
-      dateString,
+      title,
+      startDate,
+      endDate: effectiveEndDate,
       description,
-      article: articleId || null, // Use passed ID or null
-      // TODO: Add user ID
+      article: articleId || null,
+      isAllDay: isAllDay !== undefined ? isAllDay : true,
+      color,
+      important
+      // Removed world field from creation
     });
 
     const event = await newEvent.save();
-    // Populate the article title in the response if it was linked
     const populatedEvent = await TimelineEvent.findById(event._id).populate('article', 'title');
+    console.log('[Controller] Event created successfully:', populatedEvent._id);
     res.status(201).json(populatedEvent);
 
   } catch (err) {
-    console.error("Error creating timeline event:", err);
+    console.error("[Controller] Error creating timeline event:", err);
+    if (err.name === 'ValidationError') {
+        return res.status(400).json({ msg: 'Database validation failed', errors: err.errors });
+    }
     res.status(500).send('Server Error');
   }
 };
 
-// Update event
+// Update event (no world check/update)
 exports.updateEvent = async (req, res) => {
-  // Expect articleId instead of articleTitle
-  const { eventName, dateString, description, articleId } = req.body;
+  console.log(`[Controller] Received PUT /api/timeline/${req.params.id} request body:`, req.body);
+  
+  const { 
+    title, 
+    startDate, 
+    endDate, 
+    description, 
+    articleId, 
+    isAllDay, 
+    color, 
+    important 
+    // Removed world field
+  } = req.body;
   const eventId = req.params.id;
 
-  if (!eventName || !dateString) {
-    return res.status(400).json({ msg: 'Event Name and Date are required.' });
+  // Updated Validation Logic
+  let errors = {};
+  if (!title) errors.title = 'Title is required';
+  if (!startDate) {
+    errors.startDate = 'Start date is required';
+  } else {
+    if (startDate.year == null) errors.startDate = 'Start date year is required';
+    if (startDate.month == null) errors.startDate = 'Start date month is required';
+    if (startDate.day == null) errors.startDate = 'Start date day is required';
   }
+  if (endDate && (endDate.year == null || endDate.month == null || endDate.day == null)) {
+      errors.endDate = 'End date must be complete (year, month, day) if provided';
+  }
+  
+  if (Object.keys(errors).length > 0) {
+    console.log('[Controller] Validation failed:', errors);
+    return res.status(400).json({ msg: 'Validation failed', errors });
+  }
+  
+  const effectiveEndDate = endDate && endDate.year !== undefined && endDate.month !== undefined && endDate.day !== undefined 
+                           ? endDate 
+                           : startDate;
 
   try {
-     // Remove article lookup by title
-    /* let articleId = null; ... */
-
-    const updateData = {
-      eventName,
-      dateString,
-      description,
-    };
-    // Only update article link if articleId is explicitly provided (even if null)
-    if (articleId !== undefined) {
-       updateData.article = articleId; // Use passed ID (can be null to unlink)
+    // Find event by ID only
+    const event = await TimelineEvent.findById(eventId);
+    if (!event) {
+      console.log(`[Controller] Event not found for update: ${eventId}`);
+      return res.status(404).json({ msg: 'Event not found' });
     }
+    
+    // Removed world/ownership check placeholder
 
-    const updatedEvent = await TimelineEvent.findByIdAndUpdate(
-      eventId,
-      { $set: updateData },
-      { new: true } // Return the updated document
-    ).populate('article', 'title'); // Populate for the response
+    // Update fields
+    event.title = title;
+    event.startDate = startDate;
+    event.endDate = effectiveEndDate;
+    event.description = description;
+    event.article = articleId !== undefined ? articleId : event.article; 
+    event.isAllDay = isAllDay !== undefined ? isAllDay : event.isAllDay;
+    event.color = color !== undefined ? color : event.color;
+    event.important = important !== undefined ? important : event.important;
 
-    if (!updatedEvent) {
-      return res.status(404).json({ msg: 'Timeline event not found' });
-    }
-
-    // TODO: Check user ownership
-
-    res.json(updatedEvent);
+    const updatedEvent = await event.save();
+    const populatedEvent = await TimelineEvent.findById(updatedEvent._id).populate('article', 'title');
+    console.log('[Controller] Event updated successfully:', populatedEvent._id);
+    res.json(populatedEvent);
 
   } catch (err) {
-    console.error(`Error updating timeline event ${eventId}:`, err);
-     if (err.kind === 'ObjectId') {
+    console.error(`[Controller] Error updating timeline event ${eventId}:`, err);
+    if (err.name === 'ValidationError') {
+        return res.status(400).json({ msg: 'Database validation failed', errors: err.errors });
+    }
+    if (err.kind === 'ObjectId' || err.name === 'CastError') {
       return res.status(404).json({ msg: 'Timeline event not found' });
     }
     res.status(500).send('Server Error');
   }
 };
 
-// Delete event
+// Delete event (no world check)
 exports.deleteEvent = async (req, res) => {
   const eventId = req.params.id;
+  
   try {
+    // Find event by ID only
     const event = await TimelineEvent.findById(eventId);
 
     if (!event) {
       return res.status(404).json({ msg: 'Timeline event not found' });
     }
 
-    // TODO: Check user ownership
+    // Removed ownership check placeholder
 
     await TimelineEvent.findByIdAndDelete(eventId);
 
@@ -114,7 +179,7 @@ exports.deleteEvent = async (req, res) => {
 
   } catch (err) {
     console.error(`Error deleting timeline event ${eventId}:`, err);
-    if (err.kind === 'ObjectId') {
+    if (err.kind === 'ObjectId' || err.name === 'CastError') {
       return res.status(404).json({ msg: 'Timeline event not found' });
     }
     res.status(500).send('Server Error');

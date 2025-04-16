@@ -17,10 +17,19 @@ app.use(express.json());
 // Serve static files from the uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Import routes
+const articleRoutes = require('./routes/articles');
+const timelineEventRoutes = require('./routes/timelineEvents');
+const mapRoutes = require('./routes/maps');
+const calendarSettingsRoutes = require('./routes/calendarSettings');
+const worldRoutes = require('./routes/worlds');
+
 // Define Routes
-app.use('/api/articles', require('./routes/articles'));
-app.use('/api/maps', require('./routes/maps')); // Add map routes
-app.use('/api/timeline', require('./routes/timelineEvents')); // Add timeline routes
+app.use('/api/articles', articleRoutes);
+app.use('/api/timeline', timelineEventRoutes);
+app.use('/api/maps', mapRoutes);
+app.use('/api/calendar-settings', calendarSettingsRoutes);
+app.use('/api/worlds', worldRoutes);
 app.use('/api/ai', require('./routes/ai')); // Add AI routes
 // TODO: Add other routes (timeline, auth)
 

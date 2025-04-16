@@ -6,6 +6,7 @@ import './index.css'
 import App from './App.jsx'
 // import "easymde/dist/easymde.min.css"; // Removed
 import 'tippy.js/dist/tippy.css'; // Add Tippy.js base CSS
+import 'bootstrap/dist/css/bootstrap.min.css'; // Import Bootstrap CSS
 
 // Create a client with default options
 const queryClient = new QueryClient({

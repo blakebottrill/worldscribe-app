@@ -1,0 +1,48 @@
+.date-picker-container {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.date-picker-input {
+  cursor: pointer;
+}
+
+.date-picker-input .form-control {
+  background-color: #fff;
+  cursor: pointer;
+}
+
+.date-picker-icon {
+  background-color: #f8f9fa;
+  border-color: #ced4da;
+  color: #6c757d;
+}
+
+.date-picker-clear-btn {
+  padding: 0;
+  width: 38px;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
+
+.date-picker-popover {
+  max-width: none;
+  width: auto;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  border: none;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.date-picker-popover .popover-body {
+  padding: 0;
+}
+
+.required-label::after {
+  content: "*";
+  color: #dc3545;
+  margin-left: 4px;
+} 

@@ -1,217 +1,140 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FaSpinner, FaPlus } from 'react-icons/fa';
+import { FaSpinner, FaPlus, FaStream, FaCog } from 'react-icons/fa';
 import toast from 'react-hot-toast';
-// import TimelineEventList from '../components/timeline/TimelineEventList';
+import { Container, Row, Col, Button } from 'react-bootstrap'; // Added react-bootstrap components
+
+// Import the new service and components
+import timelineService from '../services/timelineService';
+import EventForm from '../components/EventForm'; // Use the calendar event form
+import { CalendarProvider, useCalendar } from '../contexts/CalendarContext'; // Import Calendar context
+
+// Keep relevant view component and article linking
 import HorizontalTimelineView from '../components/timeline/HorizontalTimelineView';
-import TimelineEventForm from '../components/timeline/TimelineEventForm';
 import ArticleLinkModal from '../components/common/ArticleLinkModal';
+import CalendarSettings from '../components/CalendarSettings'; // Import the settings modal
+
 import './TimelinePage.css';
-// TODO: Import components later
 
-// --- Utility Functions ---
-const parseDate = (dateString) => {
-  if (!dateString) return null;
-  // This is basic, assumes YYYY or YYYY-MM-DD formats mostly
-  // Consider using a date library like Moment.js or date-fns for robustness
-  const yearMatch = dateString.match(/^(\d{1,4})/); 
-  if (yearMatch) {
-      // Attempt to create a date, might need refinement based on actual date formats
-      return new Date(dateString);
+// Utility function to convert date object {year, month, day} to JS Date
+// Needed for sorting or display components that expect JS Date
+// Note: month is 0-indexed in JS Date, assuming our model is also 0-indexed
+const convertToJSDate = (dateObj) => {
+  if (!dateObj || dateObj.year === undefined || dateObj.month === undefined || dateObj.day === undefined) {
+    return null;
   }
-  return null;
+  // Month needs to be 0-indexed for JS Date constructor
+  return new Date(dateObj.year, dateObj.month, dateObj.day);
 };
 
-// --- API Functions ---
-const fetchTimelineEventsAPI = async () => {
-  const response = await fetch('http://localhost:5001/api/timeline');
-  if (!response.ok) throw new Error('Failed to fetch timeline events');
-  const data = await response.json();
-  // TODO: Update sorting based on startDate
-  return data.sort((a, b) => {
-    const dateA = parseDate(a.startDate || a.dateString);
-    const dateB = parseDate(b.startDate || b.dateString);
-    if (!dateA) return 1;
-    if (!dateB) return -1;
-    return dateA.getTime() - dateB.getTime();
-  });
-};
-
-const fetchArticlesAPI = async () => { // Reusing from WikiPage refactor
-  const response = await fetch('http://localhost:5001/api/articles');
-  if (!response.ok) throw new Error('Failed to fetch articles');
-  return response.json();
-};
-
-const createTimelineEventAPI = async (eventData) => {
-  const response = await fetch('http://localhost:5001/api/timeline', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(eventData),
-  });
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ msg: 'Failed to create event' }));
-    throw new Error(errorData.msg || `HTTP error! status: ${response.status}`);
-  }
-  return response.json();
-};
-
-const updateTimelineEventAPI = async ({ eventId, eventData }) => {
-  const response = await fetch(`http://localhost:5001/api/timeline/${eventId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(eventData),
-  });
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ msg: 'Failed to update event' }));
-    throw new Error(errorData.msg || `HTTP error! status: ${response.status}`);
-  }
-  return response.json();
-};
-
-const deleteTimelineEventAPI = async (eventId) => {
-  const response = await fetch(`http://localhost:5001/api/timeline/${eventId}`, { method: 'DELETE' });
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ msg: 'Failed to delete event' }));
-    throw new Error(errorData.msg || `HTTP error! status: ${response.status}`);
-  }
-  return { success: true, deletedId: eventId };
-};
-// --- End API Functions ---
-
-const TimelinePage = () => {
-  // Remove unused state
-  // const [events, setEvents] = useState([]);
-  // const [articles, setArticles] = useState([]);
-  // const [isLoading, setIsLoading] = useState(true);
-  // const [error, setError] = useState(null);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [editingEvent, setEditingEvent] = useState(null);
-  const [showArticleLinkModal, setShowArticleLinkModal] = useState(false);
-  const [linkModalTargetSetter, setLinkModalTargetSetter] = useState(null);
-  const [linkModalCurrentId, setLinkModalCurrentId] = useState(null);
-  
+// Main page component content
+const TimelinePageContent = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { formatDate, calendarSettings, getDaysInMonth } = useCalendar(); // Get formatting function, settings, and getDaysInMonth
+
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [showArticleLinkModal, setShowArticleLinkModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false); // State for settings modal
 
   // --- Queries ---
+  // Fetch timeline events using the new service
   const { data: events = [], isLoading: isLoadingEvents, error: eventsError } = useQuery({
-    queryKey: ['timelineEvents'],
-    queryFn: fetchTimelineEventsAPI,
+    queryKey: ['timelineEvents'], 
+    queryFn: () => timelineService.getAllEvents(), 
+    select: (data) => { 
+      // Sort data after fetching, comparing date components directly
+      return [...data].sort((a, b) => {
+        const dateA = a.startDate;
+        const dateB = b.startDate;
+
+        // Handle cases where dates might be missing or incomplete
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1; // Sort items without dates after those with dates
+        if (!dateB) return -1;
+
+        // Compare year first
+        if (dateA.year !== dateB.year) {
+          return (dateA.year || 0) - (dateB.year || 0);
+        }
+        // If years are the same, compare month
+        if (dateA.month !== dateB.month) {
+          return (dateA.month || 0) - (dateB.month || 0);
+        }
+        // If months are the same, compare day
+        if (dateA.day !== dateB.day) {
+          return (dateA.day || 0) - (dateB.day || 0);
+        }
+        
+        // If all components are the same, maintain original order
+        return 0; 
+      });
+    }
   });
 
-  // Fetch articles for linking - shares cache with WikiPage/AtlasPage
+  // Fetch articles for linking (assuming this service exists or is created)
+  // Let's reuse the old direct fetch for now, refactor later if needed
+  const fetchArticlesAPI = async () => { 
+    const response = await fetch('http://localhost:5001/api/articles');
+    if (!response.ok) throw new Error('Failed to fetch articles');
+    return response.json();
+  };
   const { data: articles = [], isLoading: isLoadingArticles, error: articlesError } = useQuery({
     queryKey: ['articles'], 
     queryFn: fetchArticlesAPI, 
   });
 
   const isLoading = isLoadingEvents || isLoadingArticles;
-  const error = eventsError || articlesError;
+  // Combine errors, prioritizing events error
+  const error = eventsError || articlesError; 
 
   // --- Mutations ---
+  // Use the new service for saving events
   const saveEventMutation = useMutation({
-    mutationFn: (eventDataWithId) => {
-        const { _id, ...eventData } = eventDataWithId;
-        if (_id) { // If ID exists, it's an update
-            return updateTimelineEventAPI({ eventId: _id, eventData });
-        } else { // Otherwise, it's a create
-            return createTimelineEventAPI(eventData);
+    mutationFn: async (eventData) => {
+        const dataToSave = { 
+            ...eventData, 
+            articleId: eventData.articleId || null 
+        }; 
+        delete dataToSave.id; 
+        
+        // Log the data being sent
+        console.log('[TimelinePage] Saving event payload:', dataToSave);
+        
+        if (eventData.id) { 
+            return await timelineService.updateEvent(eventData.id, dataToSave);
+        } else {
+            return await timelineService.createEvent(dataToSave);
         }
     },
-    onMutate: async (eventDataWithId) => {
-        const { _id, ...eventData } = eventDataWithId;
-        const isCreating = !_id;
-        const tempId = isCreating ? `temp-${Date.now()}` : null;
-
-        await queryClient.cancelQueries({ queryKey: ['timelineEvents'] });
-        const previousEvents = queryClient.getQueryData(['timelineEvents']);
-
-        // Optimistic Update
-        queryClient.setQueryData(['timelineEvents'], (old = []) => {
-            let newEvents;
-            if (isCreating) {
-                const optimisticEvent = { ...eventData, _id: tempId };
-                newEvents = [...old, optimisticEvent];
-            } else {
-                newEvents = old.map(event => 
-                    event._id === _id ? { ...event, ...eventData } : event
-                );
-            }
-            // Re-sort after optimistic update
-            return newEvents.sort((a, b) => {
-                const dateA = parseDate(a.startDate || a.dateString);
-                const dateB = parseDate(b.startDate || b.dateString);
-                if (!dateA) return 1;
-                if (!dateB) return -1;
-                return dateA.getTime() - dateB.getTime();
-            });
-        });
-        
-        // Close form immediately on optimistic update
-        setEditingEvent(null);
-        setShowAddForm(false);
-
-        return { previousEvents, tempId };
-    },
-    onError: (err, variables, context) => {
-        console.error("Error saving timeline event:", err);
-        toast.error(`Failed to save event: ${err.message}`);
-        if (context?.previousEvents) {
-            queryClient.setQueryData(['timelineEvents'], context.previousEvents);
-        }
-    },
-    onSuccess: (savedEvent, variables, context) => {
-        const isCreating = !!context?.tempId;
-        toast.success(`Event ${isCreating ? 'added' : 'updated'} successfully!`);
-        
-        // Update cache with server data, replacing temp ID if needed
-        queryClient.setQueryData(['timelineEvents'], (old = []) => {
-             const updatedEvents = old.map(event => 
-                event._id === (isCreating ? context.tempId : savedEvent._id) 
-                    ? savedEvent 
-                    : event
-             );
-             return updatedEvents.sort((a, b) => {
-                const dateA = parseDate(a.startDate || a.dateString);
-                const dateB = parseDate(b.startDate || b.dateString);
-                if (!dateA) return 1;
-                if (!dateB) return -1;
-                return dateA.getTime() - dateB.getTime();
-             });
-        });
-    },
-    onSettled: () => {
+    onSuccess: (savedEvent) => {
+        toast.success(`Event ${savedEvent.title} saved successfully!`);
         queryClient.invalidateQueries({ queryKey: ['timelineEvents'] });
-        // Invalidate articles too, in case a link changed?
-        queryClient.invalidateQueries({ queryKey: ['articles'] });
+        setShowEventForm(false);
+        setEditingEvent(null);
+    },
+    onError: (err) => {
+        // Error already logged by service, toast displayed here
+        toast.error(`Failed to save event: ${err.message || 'Check console for details'}`);
+        // Re-throw to allow EventForm's .catch() to potentially work
+        throw err; 
     },
   });
 
+  // Use the new service for deleting events
   const deleteEventMutation = useMutation({
-      mutationFn: deleteTimelineEventAPI,
-      onMutate: async (eventIdToDelete) => {
-          await queryClient.cancelQueries({ queryKey: ['timelineEvents'] });
-          const previousEvents = queryClient.getQueryData(['timelineEvents']);
-
-          queryClient.setQueryData(['timelineEvents'], (old = []) =>
-              old.filter(event => event._id !== eventIdToDelete)
-          );
-          return { previousEvents };
-      },
-      onError: (err, variables, context) => {
-           console.error("Error deleting timeline event:", err);
-           toast.error(`Failed to delete event: ${err.message}`);
-           if (context?.previousEvents) {
-               queryClient.setQueryData(['timelineEvents'], context.previousEvents);
-           }
-      },
+      mutationFn: timelineService.deleteEvent,
       onSuccess: () => {
           toast.success('Event deleted!');
+          queryClient.invalidateQueries({ queryKey: ['timelineEvents'] });
+          setShowEventForm(false); // Close form if deleting from form
+          setEditingEvent(null);
       },
-      onSettled: () => {
-           queryClient.invalidateQueries({ queryKey: ['timelineEvents'] });
+      onError: (err) => {
+           console.error("Error deleting timeline event:", err);
+           toast.error(`Failed to delete event: ${err.message || 'Unknown error'}`);
       },
   });
 
@@ -222,117 +145,146 @@ const TimelinePage = () => {
     }
   };
 
-  // Toggle Add Form visibility
+  // Open the EventForm modal for creating a new event
   const handleAddClick = () => {
-    setEditingEvent(null); // Ensure not editing
-    setShowAddForm(!showAddForm); // Toggle form visibility
-  };
-
-  // Set event data for editing, show form
-  const handleEdit = (event) => {
-    setEditingEvent(event);
-    setShowAddForm(true); // Show form for editing
-  };
-
-  // Call delete mutation
-  const handleDelete = (eventId) => {
-    if (!eventId) return;
-    if (window.confirm('Are you sure you want to delete this event?')) {
-      deleteEventMutation.mutate(eventId);
-    }
-  };
-
-  // Show article link modal (used by form)
-  const handleShowLinkModal = (currentId, targetSetter) => {
-    setLinkModalCurrentId(currentId);
-    // Store the function that will update the form's state
-    setLinkModalTargetSetter(() => targetSetter); 
-    setShowArticleLinkModal(true);
-  };
-
-  // Handle article selection in modal (used by form)
-  const handleModalSelectArticle = (selectedArticle) => {
-    if (linkModalTargetSetter) {
-      // Call the stored setter function to update the form state
-      linkModalTargetSetter(selectedArticle);
-    }
-    // Close modal and reset state
-    setShowArticleLinkModal(false);
-    setLinkModalTargetSetter(null);
-    setLinkModalCurrentId(null);
-  };
-
-  // Renamed: This is now the function passed to the form's onSubmit
-  const handleFormSubmit = (formDataFromForm) => {
-      saveEventMutation.mutate(formDataFromForm);
-  };
-
-  // Cancel button handler for the form
-  const handleFormCancel = () => {
     setEditingEvent(null);
-    setShowAddForm(false);
+    setShowEventForm(true);
   };
 
-  // Determine if the form should be visible (either adding or editing)
-  const isFormVisible = showAddForm || editingEvent !== null;
+  // Open the EventForm modal for editing an existing event
+  const handleEditEvent = (event) => {
+    const articleData = articles.find(a => a._id === event.article?._id);
+    const eventForForm = {
+        ...event,
+        id: event._id,
+        articleId: event.article?._id || null,
+        // Include article title for display in form
+        linkedArticleTitle: articleData?.title || '' 
+    };
+    setEditingEvent(eventForForm);
+    setShowEventForm(true);
+  };
+
+  // Passed to EventForm, returns the promise from the mutation
+  const handleEventSaved = (eventDataFromForm) => {
+    // Return the promise so EventForm can use .then/.catch/.finally
+    return saveEventMutation.mutateAsync(eventDataFromForm); 
+  };
+
+  // This handler is now triggered by the button within EventForm
+  const handleLinkArticleClick = () => {
+      setShowArticleLinkModal(true);
+  };
+
+  // This is called when an article is selected in the modal
+  const handleModalSelectArticle = (selectedArticle) => {
+      // Update the articleId and title in the editingEvent state
+      setEditingEvent(prev => ({
+          ...prev,
+          articleId: selectedArticle?._id || null,
+          linkedArticleTitle: selectedArticle?.title || ''
+      }));
+      setShowArticleLinkModal(false); // Close the link modal
+      // Keep the EventForm open
+  };
+
+  // Handler to pass down for deleting an event
+  const handleDeleteEvent = (eventId) => {
+    // Optional: Add confirmation here if desired, though it's better in the form
+    deleteEventMutation.mutate(eventId);
+  };
 
   // --- Render Logic ---
-  return (
-    <div className="timeline-page">
-      <div className="timeline-page-header">
-        <h2>Timeline</h2>
-        <button onClick={handleAddClick} className="add-event-button">
-          <FaPlus /> {showAddForm ? 'Cancel' : 'Add Event'}
-        </button>
-      </div>
+  // Display loading indicator more reliably
+  if (isLoading && !error) { 
+    return <Container className="text-center mt-5"><FaSpinner className="spinner" size={30} /> Loading Timeline...</Container>;
+  }
 
-      {/* Conditionally render Add/Edit Form */} 
-      {showAddForm && (
-        <TimelineEventForm
-            event={editingEvent} // Pass null for add, event data for edit
-            articles={articles}
-          onSubmit={handleFormSubmit} 
-          onCancel={handleFormCancel}
-            onShowLinkModal={handleShowLinkModal}
+  // Display error prominently if fetching fails
+  if (error && !isLoading) { 
+    return <Container className="alert alert-danger mt-5">Error loading timeline: {error.message}</Container>;
+  }
+
+  // Find the title of the currently linked article for the form
+  const currentEditingArticle = articles.find(a => a._id === editingEvent?.articleId);
+
+  return (
+    <Container fluid className="timeline-page py-4">
+      <Row className="mb-4">
+        <Col>
+          <div className="d-flex justify-content-between align-items-center">
+            <h2 className="page-title">
+              <FaStream className="me-2" />
+              Timeline / Events 
+            </h2>
+            <div>
+              <Button 
+                variant="outline-secondary" 
+                className="me-2" 
+                onClick={() => setShowSettings(true)} // Show settings modal
+              >
+                <FaCog className="me-1" /> Calendar Settings
+              </Button>
+              <Button variant="primary" onClick={handleAddClick}>
+                <FaPlus className="me-1" /> Add Event
+              </Button>
+            </div>
+          </div>
+        </Col>
+      </Row>
+
+      <HorizontalTimelineView 
+        events={events} 
+        onEventClick={handleEditEvent} 
+        formatDate={formatDate} // Keep passing this for display
+        calendarSettings={calendarSettings} // Pass settings
+        getDaysInMonth={getDaysInMonth} // Pass function
+      />
+      
+      {/* Render the new EventForm Modal */} 
+      {showEventForm && (
+          <EventForm
+            key={editingEvent?.id || 'new'} 
+            show={showEventForm}
+            onHide={() => {
+              setShowEventForm(false);
+              setEditingEvent(null);
+            }}
+            event={editingEvent} 
+            onEventSaved={handleEventSaved}
+            onDelete={handleDeleteEvent} // Pass the delete handler
+            // Pass handlers and data for article linking
+            onLinkArticleClick={handleLinkArticleClick} 
+            linkedArticleTitle={currentEditingArticle?.title || ''}
           />
       )}
-      
-      {/* Show loading spinner */}
-      {isLoading && (
-        <div className="loading-container">
-          <FaSpinner className="spinner" /> Loading events...
-        </div>
-      )}
 
-      {/* Show error message */}
-      {error && <div className="error-container">Error loading data: {error.message}</div>}
-
-      {/* Render Horizontal Timeline View */}
-      {!isLoading && !error && (
-        <HorizontalTimelineView 
-          events={events} // Pass events from query
-          // Decide what happens when an event is clicked
-          // Option 1: Open the edit form
-          onEventClick={handleEdit} 
-          // Option 2: Navigate to linked article (if exists)
-          // onEventClick={(event) => handleNavigateToArticle(event.linkedArticle)}
-        />
-      )}
-
-      {/* Article Link Modal (remains the same) */}
+      {/* Article Linking Modal */} 
       {showArticleLinkModal && (
         <ArticleLinkModal
           articles={articles} 
-          currentArticleId={linkModalCurrentId}
+          currentArticleId={editingEvent?.articleId || null} // Pass current ID from editing event
           onSelectArticle={handleModalSelectArticle}
-          onClose={() => {
-              setShowArticleLinkModal(false);
-              setLinkModalTargetSetter(null);
-              setLinkModalCurrentId(null);
-          }}
+          onClose={() => setShowArticleLinkModal(false)}
         />
       )}
-    </div>
+
+      {/* Conditionally render Calendar Settings Modal */}
+      <CalendarSettings 
+        show={showSettings} 
+        onHide={() => setShowSettings(false)} 
+      />
+
+    </Container>
+  );
+}
+
+// Main component that includes the Provider
+const TimelinePage = () => {
+  return (
+    <CalendarProvider> 
+      <TimelinePageContent />
+    </CalendarProvider>
   );
 };
 

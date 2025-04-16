@@ -9,54 +9,66 @@ const renderIcon = (iconName, size = '1.5em', color = 'currentColor') => {
   return IconComponent ? <IconComponent size={size} color={color} /> : null;
 };
 
-const TimelineItem = ({ event, style, onClick }) => {
-  const { title, startDate, endDate, icon, color, linkedArticle } = event;
+// New function to compare if two date objects represent the same day
+const areDatesEqual = (date1, date2) => {
+    if (!date1 || !date2) return false;
+    return date1.year === date2.year && 
+           date1.month === date2.month && 
+           date1.day === date2.day;
+};
+
+// Updated props: event, style, onClick (instead of onSelectEvent), formatDate
+const TimelineItem = ({ event, style, onClick, formatDate }) => {
+  // Use title, startDate, endDate from the event object
+  const { title, startDate, endDate, icon, color, article } = event; 
   
-  // Basic date formatting (can be enhanced)
+  // Use the passed formatDate function for display
   const formatDateRange = () => {
-    let start = startDate || event.dateString;
-    let end = endDate;
-    if (!start) return '';
-    if (!end || end === start) return start;
-    return `${start} - ${end}`;
-  };
-
-  // Construct style for background color and glow
-  const itemStyle = {
-    ...style, // Apply calculated left/width
-    // Set CSS variables instead of direct styles
-    '--item-bg-color': color || '#3b82f6',
-    '--item-shadow-color': color || '#3b82f6',
-  };
-
-  // Handle click - potentially navigate or open details
-  const handleClick = () => {
-    if (onClick) {
-        onClick(event); // Pass the event object up
+    if (!startDate || !formatDate) return '';
+    
+    const formattedStartDate = formatDate(startDate);
+    
+    // Check if endDate is different from startDate before formatting
+    if (!endDate || areDatesEqual(startDate, endDate)) { 
+      return formattedStartDate;
     }
-    // Or handle navigation directly if needed:
-    // if (linkedArticle) {
-    //   navigate(...);
-    // }
+    
+    const formattedEndDate = formatDate(endDate);
+    return `${formattedStartDate} – ${formattedEndDate}`;
+  };
+
+  const itemStyle = {
+    ...style,
+    '--item-bg-color': color || '#3a87ad', // Use the default from the model
+    '--item-shadow-color': color || '#3a87ad',
+  };
+
+  // Simple click handler calling the passed onClick prop
+  const handleItemClick = () => {
+      if (onClick) {
+          onClick(event); // Pass the original event object up
+      }
   };
 
   return (
     <div 
-      className="timeline-item" 
+      // Check article presence directly
+      className={`timeline-item ${article?._id ? 'has-link' : ''} clickable`} 
       style={itemStyle} 
-      onClick={handleClick}
-      title={`${title} (${formatDateRange()})`} // Tooltip for full info
+      onClick={handleItemClick} // Use the simple handler
+      // Use title field here
+      title={`${title || 'Untitled Event'} (${formatDateRange()})`} 
     >
       <div className="timeline-item-icon">
-        {renderIcon(icon || 'FaCalendarAlt', '1.2em')} {/* Default icon */}
+        {/* Default icon is now FaStream or similar? Let's use FaCalendarAlt for now */}
+        {renderIcon(icon || 'FaCalendarAlt', '1.2em')}
       </div>
       <div className="timeline-item-content">
+        {/* Use title field here */}
         <div className="timeline-item-title">{title || 'Untitled Event'}</div>
-        <div className="timeline-item-dates">{formatDateRange()}</div>
+        {/* Display the formatted date range */}
+        <div className="timeline-item-dates">{formatDateRange()}</div> 
       </div>
-      {/* Optional: Add indicators for start/end or interactivity */}
-      {/* <div className="timeline-item-handle left">‹</div> */}
-      {/* <div className="timeline-item-handle right">›</div> */}
     </div>
   );
 };

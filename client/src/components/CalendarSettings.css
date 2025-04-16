@@ -1,0 +1,36 @@
+.calendar-settings-modal .modal-content {
+  border-radius: 8px;
+}
+
+.calendar-settings-modal .card {
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+}
+
+.calendar-settings-modal .tab-content {
+  padding-top: 10px;
+}
+
+.calendar-settings-modal .btn-danger {
+  min-width: 40px;
+}
+
+.calendar-settings-modal .form-control:focus,
+.calendar-settings-modal .form-select:focus {
+  border-color: #6c757d;
+  box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.25);
+}
+
+.calendar-settings-modal .tabs {
+  border-bottom: 2px solid #e9ecef;
+}
+
+.calendar-settings-modal .nav-link.active {
+  font-weight: 600;
+  color: #495057;
+  border-bottom: 2px solid #495057;
+}
+
+.calendar-settings-modal .form-text {
+  font-size: 0.8rem;
+} 

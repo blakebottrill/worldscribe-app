@@ -6,6 +6,7 @@ import AppLayout from './components/layout/AppLayout'; // Import the layout
 import WikiPage from './pages/WikiPage';
 import AtlasPage from './pages/AtlasPage';
 import TimelinePage from './pages/TimelinePage';
+// import CalendarPage from './pages/CalendarPage';
 // import SettingsPage from './pages/SettingsPage'; // Assuming future page
 // import LoginPage from './pages/LoginPage'; // Assuming future page
 // import HomePage from './pages/HomePage'; // Placeholder if needed

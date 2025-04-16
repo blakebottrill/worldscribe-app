@@ -15,11 +15,12 @@ const ArticleLinkModal = ({ articles, currentArticleId, onSelectArticle, onClose
 
   const currentArticle = articles.find(a => a._id === currentArticleId);
 
-  // Same modal styles as PinEditModal for consistency
+  // Increase zIndex to ensure it appears above other modals
   const modalOverlayStyle = {
     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.7)', display: 'flex',
-    justifyContent: 'center', alignItems: 'center', zIndex: 1050, // Higher than other modals if needed
+    justifyContent: 'center', alignItems: 'center', 
+    zIndex: 1060, // Increased z-index
   };
   const modalContentStyle = {
     background: '#333', color: '#eee', padding: '20px',

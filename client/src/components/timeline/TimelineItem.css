@@ -8,7 +8,8 @@
   transform: none; /* Remove translateY(-50%) */
   height: 55px; /* Match image aspect ratio */
   min-width: 50px; /* Reduced min width for point events */
-  max-width: 400px; /* Add max width */
+  /* Remove max-width constraint to allow full expansion */
+  /* max-width: 400px;  */
   padding: 0 15px; /* Horizontal padding */
   border-radius: 9999px; /* Fully rounded ends */
   display: flex;

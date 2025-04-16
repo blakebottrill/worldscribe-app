@@ -1,0 +1,154 @@
+.calendar-card {
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  border: none;
+}
+
+.calendar-card .card-header {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e3e6f0;
+  padding: 0.75rem 1rem;
+}
+
+.calendar-nav-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  padding: 0;
+  color: #495057;
+}
+
+.calendar-settings-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  padding: 0;
+  color: #6c757d;
+}
+
+.calendar-header {
+  font-weight: 600;
+  color: #343a40;
+}
+
+/* Style for the year input */
+.calendar-year-input {
+  /* width: 100px; */ /* Removed fixed width */
+  flex-grow: 1; /* Allow input to take available space */
+  min-width: 75px; /* Ensure enough space for year */
+  /* max-width: 100px; */ /* Removed max-width limit */
+  text-align: center;
+  font-weight: 600;
+  border: 1px solid transparent; /* Hide border initially */
+  background-color: transparent; /* Make background transparent */
+  padding: 0.375rem 0.25rem; /* Adjust padding */
+  margin: 0 0.25rem; /* Add some spacing */
+  -moz-appearance: textfield; /* Hides arrows in Firefox */
+}
+
+/* Hide arrows in Chrome, Safari, Edge, Opera */
+.calendar-year-input::-webkit-outer-spin-button,
+.calendar-year-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Add subtle border on hover/focus */
+.calendar-year-input:hover,
+.calendar-year-input:focus {
+  border: 1px solid #ced4da;
+  background-color: #fff; /* White background on focus */
+}
+
+.calendar-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.calendar-weekday-header, /* Target both old and new headers */
+.calendar-table th {
+  padding: 0.5rem 0.25rem; /* Reduced padding slightly */
+  font-weight: 600;
+  color: #6c757d;
+  border-bottom: 1px solid #e3e6f0;
+  font-size: 0.75rem; /* Slightly smaller font */
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center; /* Ensure centered */
+}
+
+.calendar-day {
+  padding: 0.5rem;
+  height: 40px; /* Slightly smaller height */
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  font-weight: 500;
+  font-size: 0.9rem; /* Adjust font size if needed */
+}
+
+.calendar-day:hover {
+  background-color: #f1f3f5;
+}
+
+.calendar-day.other-month {
+  color: #adb5bd;
+  background-color: #f8f9fa;
+}
+
+.calendar-day.selected {
+  background-color: #e7f5ff;
+  color: #0d6efd;
+  position: relative;
+  font-weight: 700; /* Make selected bolder */
+}
+
+.calendar-day.selected::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px; /* Slightly smaller dot */
+  height: 5px;
+  border-radius: 50%;
+  background-color: #0d6efd;
+}
+
+.dropdown-menu-calendar {
+  max-height: 300px;
+  overflow-y: auto;
+  font-size: 0.9rem; /* Adjust dropdown font size */
+}
+
+.dropdown-menu-calendar.year-dropdown {
+  min-width: 100px;
+}
+
+.dropdown-menu-calendar .dropdown-item.active,
+.dropdown-menu-calendar .dropdown-item:active {
+  background-color: #e7f5ff;
+  color: #0d6efd;
+}
+
+.dropdown-toggle {
+  padding: 0.375rem 0.75rem;
+  border-radius: 4px;
+  font-weight: 600;
+  background-color: #f8f9fa; /* Match header */
+  border: none;
+  color: #343a40;
+}
+
+.dropdown-toggle:hover,
+.dropdown-toggle:focus {
+    background-color: #e9ecef;
+} 
