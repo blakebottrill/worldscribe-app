@@ -288,11 +288,11 @@ const TimelinePage = () => {
 
       {/* Conditionally render Add/Edit Form */} 
       {showAddForm && (
-          <TimelineEventForm 
+        <TimelineEventForm
             event={editingEvent} // Pass null for add, event data for edit
             articles={articles}
-            onSubmit={handleFormSubmit}
-            onCancel={handleFormCancel}
+          onSubmit={handleFormSubmit} 
+          onCancel={handleFormCancel}
             onShowLinkModal={handleShowLinkModal}
           />
       )}
@@ -306,7 +306,7 @@ const TimelinePage = () => {
 
       {/* Show error message */}
       {error && <div className="error-container">Error loading data: {error.message}</div>}
-      
+
       {/* Render Horizontal Timeline View */}
       {!isLoading && !error && (
         <HorizontalTimelineView 
@@ -324,12 +324,12 @@ const TimelinePage = () => {
         <ArticleLinkModal
           articles={articles} 
           currentArticleId={linkModalCurrentId}
-          onSelectArticle={handleModalSelectArticle} 
+          onSelectArticle={handleModalSelectArticle}
           onClose={() => {
               setShowArticleLinkModal(false);
               setLinkModalTargetSetter(null);
               setLinkModalCurrentId(null);
-          }} 
+          }}
         />
       )}
     </div>

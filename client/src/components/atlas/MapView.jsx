@@ -111,6 +111,7 @@ const MapView = ({
   const dragStartPos = useRef({ x: 0, y: 0 });
   const isDraggingRef = useRef(false);
   const mapIsDragging = useRef(false); // Track if the map is being dragged
+  const mouseDragged = useRef(false); // Track if mouse has moved since mousedown on a pin
   const dragThreshold = 5; // Pixels threshold to initiate drag
 
   // Use hook for both menus
@@ -472,8 +473,14 @@ const MapView = ({
                     }
                   }}
                   onMouseDown={(e) => {
-                    // --- Start of onMouseDown ---
-                    if (pinsLocked) return; // Ignore if pins are locked
+                    // For locked pins, track starting position to detect movement
+                    if (pinsLocked) {
+                      mouseDragged.current = false;
+                      dragStartPos.current = { x: e.clientX, y: e.clientY };
+                      return;
+                    }
+                    
+                    // --- Rest of onMouseDown for unlocked pins ---
                     if (e.button !== 0) return; // Only allow left clicks for dragging
 
                     // Hide tooltip immediately on mousedown for unlocked pins
@@ -562,7 +569,18 @@ const MapView = ({
                     // Add event listeners
                     document.addEventListener('mousemove', handleMouseMove);
                     document.addEventListener('mouseup', handleMouseUp);
-                    // --- End of onMouseDown ---
+                  }}
+                  onMouseMove={(e) => {
+                    // Track mouse movement for locked pins
+                    if (pinsLocked) {
+                      const dx = e.clientX - dragStartPos.current.x;
+                      const dy = e.clientY - dragStartPos.current.y;
+                      
+                      // Consider mouse dragged if it moved more than a threshold (Increased from 5 to 10)
+                      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                        mouseDragged.current = true;
+                      }
+                    }
                   }}
                   onClick={(e) => {
                     // Prevent default click behavior if dragging occurred
@@ -572,13 +590,19 @@ const MapView = ({
                     }
 
                     // Handle click for LOCKED pins
-                    if (pinsLocked && !mapIsDragging.current) {
-                       // Hide tooltip before navigating
-                      const tippyInstance = e.currentTarget._tippy;
-                      if (tippyInstance) tippyInstance.hide();
+                    if (pinsLocked) {
+                      // Log state before check for debugging
+                      console.log(`Locked pin click check: mapIsDragging=${mapIsDragging.current}, mouseDragged=${mouseDragged.current}`); 
                       
-                      e.stopPropagation(); // Prevent potential map interaction
-                      onPinClick(pin.article?._id);
+                      // Only navigate if the mouse was not dragged significantly over the pin
+                      if (!mouseDragged.current) { 
+                        // Hide tooltip before navigating
+                        const tippyInstance = e.currentTarget._tippy;
+                        if (tippyInstance) tippyInstance.hide();
+                        
+                        e.stopPropagation(); // Prevent potential map interaction
+                        onPinClick(pin.article?._id);
+                      }
                     }
                     // Click for UNLOCKED pins is handled in onMouseDown/handleMouseUp logic
                   }}
