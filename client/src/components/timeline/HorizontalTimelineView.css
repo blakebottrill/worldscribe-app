@@ -8,6 +8,11 @@
   background-color: var(--background-color, #1a202c); /* Dark background */
   border: 1px solid var(--border-color, #4a5568);
   position: relative; /* Needed for absolute positioning of items */
+  cursor: grab; /* Default cursor for panning */
+}
+
+.timeline-view-container.is-panning {
+  cursor: grabbing; /* Cursor during active pan */
 }
 
 .timeline-track {

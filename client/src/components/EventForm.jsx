@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Button, Form, Row, Col } from 'react-bootstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCalendarPlus, faTimes, faLink, faUnlink, faTrashAlt } from '@fortawesome/free-solid-svg-icons';
@@ -7,8 +7,65 @@ import { useCalendar } from '../contexts/CalendarContext';
 import toast from 'react-hot-toast';
 import './EventForm.css';
 
+// --- Copied Helper Function (Ideally move to utils) ---
+const dateToDayNumber = (dateObj, settings, getDaysInMonthFunc) => {
+    // ... (Full implementation of dateToDayNumber as used previously)
+  if (
+    !dateObj ||
+    dateObj.year === undefined ||
+    dateObj.month === undefined ||
+    dateObj.day === undefined ||
+    !settings ||
+    !getDaysInMonthFunc ||
+    dateObj.month < 0 ||
+    dateObj.month >= settings.monthNames.length ||
+    dateObj.day < 1
+  ) {
+    return null; 
+  }
+  let totalDays = 0;
+  const targetYear = dateObj.year;
+  const targetMonth = dateObj.month;
+  const targetDay = dateObj.day;
+  if (targetYear < 1) {
+    return null;
+  }
+  for (let y = 1; y < targetYear; y++) {
+    let daysInYearY = 0;
+    for (let m = 0; m < settings.monthNames.length; m++) {
+      daysInYearY += getDaysInMonthFunc(m, y);
+    }
+    if (!Number.isFinite(daysInYearY)) {
+        return null;
+    }
+    totalDays += daysInYearY;
+     if (totalDays > Number.MAX_SAFE_INTEGER / 2) {
+        totalDays = Number.MAX_SAFE_INTEGER / 2;
+        break;
+     }
+  }
+  for (let m = 0; m < targetMonth; m++) {
+    const daysInMonthM = getDaysInMonthFunc(m, targetYear);
+     if (!Number.isFinite(daysInMonthM)) {
+        return null;
+    }
+    totalDays += daysInMonthM;
+  }
+  const daysInTargetMonth = getDaysInMonthFunc(targetMonth, targetYear);
+  if (targetDay > daysInTargetMonth) {
+      totalDays += daysInTargetMonth;
+  } else {
+       totalDays += targetDay;
+  }
+  if (!Number.isFinite(totalDays)) {
+      return null;
+  }
+  return totalDays > 0 ? totalDays : 1;
+};
+// --- End Helper Function ---
+
 const EventForm = ({ show, onHide, event = null, onEventSaved, onDelete, onLinkArticleClick, linkedArticleTitle }) => {
-  const { formatDate } = useCalendar();
+  const { formatDate, calendarSettings, getDaysInMonth } = useCalendar();
   const [loading, setLoading] = useState(false);
   const [validated, setValidated] = useState(false);
   
@@ -45,6 +102,20 @@ const EventForm = ({ show, onHide, event = null, onEventSaved, onDelete, onLinkA
     }
   }, [event, show, linkedArticleTitle]);
   
+  // --- NEW useEffect to synchronize End Date when Start Date changes ---
+  useEffect(() => {
+    if (formData.startDate && formData.endDate) {
+        const startDayNum = dateToDayNumber(formData.startDate, calendarSettings, getDaysInMonth);
+        const endDayNum = dateToDayNumber(formData.endDate, calendarSettings, getDaysInMonth);
+
+        if (startDayNum !== null && endDayNum !== null && startDayNum > endDayNum) {
+            console.log("Start date changed to be after end date. Updating end date.");
+            setFormData(prev => ({ ...prev, endDate: prev.startDate }));
+        }
+    }
+    // Only run when startDate changes (or calendar settings change)
+  }, [formData.startDate, calendarSettings, getDaysInMonth]); 
+
   const resetForm = () => {
     setFormData({
       title: '',
@@ -200,6 +271,7 @@ const EventForm = ({ show, onHide, event = null, onEventSaved, onDelete, onLinkA
                 value={formData.endDate}
                 onChange={(date) => handleDateChange('endDate', date)}
                 id="event-end-date"
+                minDate={formData.startDate}
                 disabled={loading}
               />
             </Col>

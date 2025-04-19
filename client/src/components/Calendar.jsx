@@ -1,11 +1,68 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, Button, Row, Col, Dropdown, Form } from 'react-bootstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import { useCalendar } from '../contexts/CalendarContext';
 import './Calendar.css';
 
-const Calendar = ({ onDateSelect, initialDate }) => {
+// --- Copied Helper Function (Ideally move to utils) ---
+const dateToDayNumber = (dateObj, settings, getDaysInMonthFunc) => {
+    // ... (Full implementation of dateToDayNumber as used in HorizontalTimelineView)
+  if (
+    !dateObj ||
+    dateObj.year === undefined ||
+    dateObj.month === undefined ||
+    dateObj.day === undefined ||
+    !settings ||
+    !getDaysInMonthFunc ||
+    dateObj.month < 0 ||
+    dateObj.month >= settings.monthNames.length ||
+    dateObj.day < 1
+  ) {
+    return null; 
+  }
+  let totalDays = 0;
+  const targetYear = dateObj.year;
+  const targetMonth = dateObj.month;
+  const targetDay = dateObj.day;
+  if (targetYear < 1) {
+    return null;
+  }
+  for (let y = 1; y < targetYear; y++) {
+    let daysInYearY = 0;
+    for (let m = 0; m < settings.monthNames.length; m++) {
+      daysInYearY += getDaysInMonthFunc(m, y);
+    }
+    if (!Number.isFinite(daysInYearY)) {
+        return null;
+    }
+    totalDays += daysInYearY;
+     if (totalDays > Number.MAX_SAFE_INTEGER / 2) {
+        totalDays = Number.MAX_SAFE_INTEGER / 2;
+        break;
+     }
+  }
+  for (let m = 0; m < targetMonth; m++) {
+    const daysInMonthM = getDaysInMonthFunc(m, targetYear);
+     if (!Number.isFinite(daysInMonthM)) {
+        return null;
+    }
+    totalDays += daysInMonthM;
+  }
+  const daysInTargetMonth = getDaysInMonthFunc(targetMonth, targetYear);
+  if (targetDay > daysInTargetMonth) {
+      totalDays += daysInTargetMonth;
+  } else {
+       totalDays += targetDay;
+  }
+  if (!Number.isFinite(totalDays)) {
+      return null;
+  }
+  return totalDays > 0 ? totalDays : 1;
+};
+// --- End Helper Function ---
+
+const Calendar = ({ onDateSelect, initialDate, minDate = null }) => {
   const { 
     calendarSettings, 
     loading,
@@ -21,6 +78,16 @@ const Calendar = ({ onDateSelect, initialDate }) => {
   
   const [yearInputValue, setYearInputValue] = useState(String(currentYear));
   const yearInputRef = useRef(null);
+
+  // Convert minDate to day number only once or when it changes
+  const minDayNumber = useMemo(() => {
+      if (!minDate) return null;
+      return dateToDayNumber(minDate, calendarSettings, getDaysInMonth);
+  }, [minDate, calendarSettings, getDaysInMonth]);
+
+  // --- DEBUG LOGGING for minDayNumber ---
+  console.log(`[Calendar Render] minDate prop:`, minDate, `Calculated minDayNumber:`, minDayNumber);
+  // --- END DEBUG LOGGING ---
 
   useEffect(() => {
     if (!calendarSettings || loading) return;
@@ -108,6 +175,27 @@ const Calendar = ({ onDateSelect, initialDate }) => {
   };
   
   const handleDateClick = (day) => {
+    // Convert clicked day to day number
+    const clickedDayNumber = dateToDayNumber(day, calendarSettings, getDaysInMonth);
+    
+    // --- DEBUG LOGGING --- 
+    console.log(`[handleDateClick] Clicked Day: ${day.day}/${day.month}/${day.year}, DayNum: ${clickedDayNumber}, MinDayNum: ${minDayNumber}`);
+    // --- END DEBUG LOGGING --- 
+
+    // Check against minDayNumber
+    if (minDayNumber !== null && clickedDayNumber !== null && clickedDayNumber < minDayNumber) {
+        // --- DEBUG LOGGING --- 
+        console.log(`[handleDateClick] Click PREVENTED (before minDate)`);
+        // --- END DEBUG LOGGING --- 
+        console.warn("Selected date is before the minimum allowed date.");
+        return; // Prevent selection
+    }
+
+    // --- DEBUG LOGGING --- 
+    console.log(`[handleDateClick] Click ALLOWED`);
+    // --- END DEBUG LOGGING --- 
+
+    // If valid, proceed with selection
     const date = {
       day: day.day,
       month: day.month,
@@ -157,15 +245,38 @@ const Calendar = ({ onDateSelect, initialDate }) => {
       const weekDays = calendarDays.slice(i, i + daysPerWeek);
       rows.push(
         <tr key={i}>
-          {weekDays.map((day, index) => (
-            <td 
-              key={index} 
-              className={`text-center calendar-day ${day.isCurrentMonth ? '' : 'other-month'} ${isSelectedDate(day) ? 'selected' : ''}`}
-              onClick={() => day.day && handleDateClick(day)}
-            >
-              {day.day}
-            </td>
-          ))}
+          {weekDays.map((day, index) => {
+            // Calculate if the day is disabled
+            let isDisabled = false;
+            let currentDayNumber = null; // Keep track for logging
+            if (day.day && minDayNumber !== null) { 
+              currentDayNumber = dateToDayNumber(day, calendarSettings, getDaysInMonth);
+              if (currentDayNumber !== null && currentDayNumber < minDayNumber) {
+                isDisabled = true;
+              }
+            }
+            
+            // --- DEBUG LOGGING for isDisabled ---
+            if (day.day) { // Only log for actual days, not empty cells
+                console.log(`[renderCalendarDays] Day: ${day.day}/${day.month}/${day.year}, DayNum: ${currentDayNumber}, minDayNum: ${minDayNumber}, isDisabled: ${isDisabled}`);
+            }
+            // --- END DEBUG LOGGING ---
+
+            return (
+              <td 
+                key={index} 
+                className={`text-center calendar-day 
+                  ${day.isCurrentMonth ? '' : 'other-month'} 
+                  ${isSelectedDate(day) ? 'selected' : ''}
+                  ${isDisabled ? 'disabled' : ''} // Add disabled class
+                `}
+                // Only attach onClick if not disabled
+                onClick={() => !isDisabled && day.day && handleDateClick(day)}
+              >
+                {day.day}
+              </td>
+            );
+          })}
         </tr>
       );
     }

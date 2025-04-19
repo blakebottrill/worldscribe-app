@@ -123,6 +123,23 @@
   background-color: #0d6efd;
 }
 
+.calendar-day.disabled {
+  color: #adb5bd; /* Lighter text color */
+  background-color: #e9ecef; /* Slightly different background */
+  cursor: not-allowed; /* Indicate non-interactive */
+  /* Optional: remove hover effect for disabled days */
+  &:hover {
+    background-color: #e9ecef; 
+  }
+}
+
+/* Ensure selected style overrides disabled if somehow selected */
+.calendar-day.selected.disabled {
+  background-color: #e7f5ff; /* Keep selected background */
+  color: #0d6efd; /* Keep selected text color */
+  cursor: default; /* Cursor back to default if selected */
+}
+
 .dropdown-menu-calendar {
   max-height: 300px;
   overflow-y: auto;

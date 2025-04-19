@@ -15,7 +15,8 @@ const DatePicker = ({
   name,
   id,
   isInvalid,
-  invalidMessage
+  invalidMessage,
+  minDate = null
 }) => {
   const { formatDate } = useCalendar();
   const [showCalendar, setShowCalendar] = useState(false);
@@ -145,6 +146,7 @@ const DatePicker = ({
           <Calendar
             onDateSelect={handleDateSelect}
             initialDate={selectedDate}
+            minDate={minDate}
           />
         </div>
       )}
