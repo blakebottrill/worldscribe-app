@@ -18,7 +18,15 @@ const areDatesEqual = (date1, date2) => {
 };
 
 // Updated props: event, style, onClick (instead of onSelectEvent), formatDate
-const TimelineItem = ({ event, style, onClick, formatDate }) => {
+// Added props: extendsLeft and extendsRight flags
+const TimelineItem = ({ 
+  event, 
+  style, 
+  onClick, 
+  formatDate, 
+  extendsLeft = false, 
+  extendsRight = false 
+}) => {
   // Use title, startDate, endDate from the event object
   const { title, startDate, endDate, icon, color, article } = event; 
   
@@ -52,23 +60,40 @@ const TimelineItem = ({ event, style, onClick, formatDate }) => {
 
   return (
     <div 
-      // Check article presence directly
-      className={`timeline-item ${article?._id ? 'has-link' : ''} clickable`} 
+      // Add CSS classes based on extends flags
+      className={`
+        timeline-item 
+        ${article?._id ? 'has-link' : ''} 
+        clickable
+        ${extendsLeft ? 'extends-left' : ''}
+        ${extendsRight ? 'extends-right' : ''}
+      `}
       style={itemStyle} 
-      onClick={handleItemClick} // Use the simple handler
-      // Use title field here
+      onClick={handleItemClick} 
       title={`${title || 'Untitled Event'} (${formatDateRange()})`} 
     >
+      {/* Left edge indicator if the event extends beyond visible range */}
+      {extendsLeft && (
+        <div className="timeline-item-edge-indicator left">
+          {renderIcon('FaAngleLeft', '1.5em')}
+        </div>
+      )}
+      
       <div className="timeline-item-icon">
-        {/* Default icon is now FaStream or similar? Let's use FaCalendarAlt for now */}
         {renderIcon(icon || 'FaCalendarAlt', '1.2em')}
       </div>
+      
       <div className="timeline-item-content">
-        {/* Use title field here */}
         <div className="timeline-item-title">{title || 'Untitled Event'}</div>
-        {/* Display the formatted date range */}
         <div className="timeline-item-dates">{formatDateRange()}</div> 
       </div>
+      
+      {/* Right edge indicator if the event extends beyond visible range */}
+      {extendsRight && (
+        <div className="timeline-item-edge-indicator right">
+          {renderIcon('FaAngleRight', '1.5em')}
+        </div>
+      )}
     </div>
   );
 };

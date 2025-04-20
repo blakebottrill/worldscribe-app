@@ -6,65 +6,10 @@ import DatePicker from './DatePicker';
 import { useCalendar } from '../contexts/CalendarContext';
 import toast from 'react-hot-toast';
 import './EventForm.css';
+import ArticleLinkModal from './common/ArticleLinkModal';
+import { dateToDayNumber } from '../utils/calendarUtils';
 
-// --- Copied Helper Function (Ideally move to utils) ---
-const dateToDayNumber = (dateObj, settings, getDaysInMonthFunc) => {
-    // ... (Full implementation of dateToDayNumber as used previously)
-  if (
-    !dateObj ||
-    dateObj.year === undefined ||
-    dateObj.month === undefined ||
-    dateObj.day === undefined ||
-    !settings ||
-    !getDaysInMonthFunc ||
-    dateObj.month < 0 ||
-    dateObj.month >= settings.monthNames.length ||
-    dateObj.day < 1
-  ) {
-    return null; 
-  }
-  let totalDays = 0;
-  const targetYear = dateObj.year;
-  const targetMonth = dateObj.month;
-  const targetDay = dateObj.day;
-  if (targetYear < 1) {
-    return null;
-  }
-  for (let y = 1; y < targetYear; y++) {
-    let daysInYearY = 0;
-    for (let m = 0; m < settings.monthNames.length; m++) {
-      daysInYearY += getDaysInMonthFunc(m, y);
-    }
-    if (!Number.isFinite(daysInYearY)) {
-        return null;
-    }
-    totalDays += daysInYearY;
-     if (totalDays > Number.MAX_SAFE_INTEGER / 2) {
-        totalDays = Number.MAX_SAFE_INTEGER / 2;
-        break;
-     }
-  }
-  for (let m = 0; m < targetMonth; m++) {
-    const daysInMonthM = getDaysInMonthFunc(m, targetYear);
-     if (!Number.isFinite(daysInMonthM)) {
-        return null;
-    }
-    totalDays += daysInMonthM;
-  }
-  const daysInTargetMonth = getDaysInMonthFunc(targetMonth, targetYear);
-  if (targetDay > daysInTargetMonth) {
-      totalDays += daysInTargetMonth;
-  } else {
-       totalDays += targetDay;
-  }
-  if (!Number.isFinite(totalDays)) {
-      return null;
-  }
-  return totalDays > 0 ? totalDays : 1;
-};
-// --- End Helper Function ---
-
-const EventForm = ({ show, onHide, event = null, onEventSaved, onDelete, onLinkArticleClick, linkedArticleTitle }) => {
+const EventForm = ({ show, onHide, event = null, onEventSaved, onDelete, articles = [] }) => {
   const { formatDate, calendarSettings, getDaysInMonth } = useCalendar();
   const [loading, setLoading] = useState(false);
   const [validated, setValidated] = useState(false);
@@ -78,7 +23,7 @@ const EventForm = ({ show, onHide, event = null, onEventSaved, onDelete, onLinkA
     articleId: null,
   });
   
-  const [currentLinkedArticleTitle, setCurrentLinkedArticleTitle] = useState('');
+  const [showLinkModal, setShowLinkModal] = useState(false);
 
   useEffect(() => {
     if (event) {
@@ -91,12 +36,10 @@ const EventForm = ({ show, onHide, event = null, onEventSaved, onDelete, onLinkA
         color: event.color || '#4a6de5',
         articleId: event.articleId || null,
       });
-      setCurrentLinkedArticleTitle(linkedArticleTitle || '');
     } else {
       resetForm();
-      setCurrentLinkedArticleTitle('');
     }
-  }, [event, show, linkedArticleTitle]);
+  }, [event?.id, show]);
   
   // --- NEW useEffect to synchronize End Date when Start Date changes ---
   useEffect(() => {
@@ -123,7 +66,6 @@ const EventForm = ({ show, onHide, event = null, onEventSaved, onDelete, onLinkA
       id: null
     });
     setValidated(false);
-    setCurrentLinkedArticleTitle('');
   };
   
   const handleInputChange = (e) => {
@@ -142,15 +84,20 @@ const EventForm = ({ show, onHide, event = null, onEventSaved, onDelete, onLinkA
   };
   
   const handleLinkClick = () => {
-    if (onLinkArticleClick) {
-      onLinkArticleClick();
-    }
+    setShowLinkModal(true);
   };
 
   const handleUnlinkClick = (e) => {
     e.stopPropagation();
     setFormData(prev => ({ ...prev, articleId: null }));
-    setCurrentLinkedArticleTitle('');
+  };
+
+  const handleArticleSelected = (selectedArticle) => {
+      setFormData(prev => ({
+          ...prev,
+          articleId: selectedArticle?._id || null,
+      }));
+      setShowLinkModal(false);
   };
 
   const handleSubmit = (e) => {
@@ -198,143 +145,160 @@ const EventForm = ({ show, onHide, event = null, onEventSaved, onDelete, onLinkA
     }
   };
   
-  return (
-    <Modal 
-      show={show} 
-      onHide={onHide}
-      centered
-      className="event-form-modal"
-    >
-      <Modal.Header closeButton>
-        <Modal.Title>
-          <FontAwesomeIcon icon={faCalendarPlus} className="me-2" />
-          {event && event.id ? 'Edit Event' : 'Create Event'}
-        </Modal.Title>
-      </Modal.Header>
-      
-      <Form noValidate validated={validated} onSubmit={handleSubmit}>
-        <Modal.Body>
-          <Form.Group className="mb-3">
-            <Form.Label className="required-label">Title</Form.Label>
-            <Form.Control
-              type="text"
-              name="title"
-              value={formData.title}
-              onChange={handleInputChange}
-              placeholder="Event title"
-              required
-              disabled={loading}
-            />
-            <Form.Control.Feedback type="invalid">
-              Please provide a title
-            </Form.Control.Feedback>
-          </Form.Group>
-          
-          <Form.Group className="mb-3">
-            <Form.Label>Description</Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={3}
-              name="description"
-              value={formData.description}
-              onChange={handleInputChange}
-              placeholder="Event description"
-              disabled={loading}
-            />
-          </Form.Group>
-          
-          <Row className="mb-3">
-            <Col md={12}>
-              <DatePicker
-                label="Start Date"
-                required
-                value={formData.startDate}
-                onChange={(date) => handleDateChange('startDate', date)}
-                id="event-start-date"
-                isInvalid={validated && !formData.startDate}
-                invalidMessage="Start date is required"
-                disabled={loading}
-              />
-            </Col>
-          </Row>
-          
-          <Row className="mb-3">
-            <Col md={12}>
-              <DatePicker
-                label="End Date"
-                value={formData.endDate}
-                onChange={(date) => handleDateChange('endDate', date)}
-                id="event-end-date"
-                minDate={formData.startDate}
-                disabled={loading}
-              />
-            </Col>
-          </Row>
-          
-          <Form.Group className="mb-3">
-            <Form.Label>Event Color</Form.Label>
-            <Form.Control
-              type="color"
-              name="color"
-              value={formData.color}
-              onChange={handleInputChange}
-              title="Choose event color"
-              disabled={loading}
-            />
-          </Form.Group>
+  const linkedArticleTitleDisplay = useMemo(() => {
+      if (!formData.articleId || !articles || articles.length === 0) return 'None';
+      const linkedArticle = articles.find(a => a._id === formData.articleId);
+      return linkedArticle?.title || 'Linked (Article not found)'; 
+  }, [formData.articleId, articles]);
 
-          <Form.Group className="mb-3">
-            <Form.Label>Linked Article</Form.Label>
-            <div className="d-flex align-items-center">
-              <span className="linked-article-display me-2">
-                {currentLinkedArticleTitle || 'None'}
-              </span>
-              <Button 
-                variant="outline-secondary" 
-                size="sm"
-                onClick={handleLinkClick}
-                disabled={loading}
-                className="me-1"
-              >
-                <FontAwesomeIcon icon={faLink} className="me-1" />
-                {formData.articleId ? 'Change' : 'Link'}
-              </Button>
-              {formData.articleId && (
-                <Button
-                  variant="outline-danger"
-                  size="sm"
-                  onClick={handleUnlinkClick}
-                  disabled={loading}
-                  title="Unlink Article"
-                >
-                  <FontAwesomeIcon icon={faUnlink} />
-                </Button>
-              )}
-            </div>
-          </Form.Group>
-        </Modal.Body>
+  return (
+    <>
+      <Modal 
+        show={show} 
+        onHide={onHide}
+        centered
+        className="event-form-modal"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <FontAwesomeIcon icon={faCalendarPlus} className="me-2" />
+            {event && event.id ? 'Edit Event' : 'Create Event'}
+          </Modal.Title>
+        </Modal.Header>
         
-        <Modal.Footer>
-          {event && event.id && (
-            <Button 
-              variant="danger" 
-              onClick={handleDelete} 
-              disabled={loading} 
-              className="me-auto"
-            >
-              <FontAwesomeIcon icon={faTrashAlt} className="me-1" />
-              Delete
+        <Form noValidate validated={validated} onSubmit={handleSubmit}>
+          <Modal.Body>
+            <Form.Group className="mb-3">
+              <Form.Label className="required-label">Title</Form.Label>
+              <Form.Control
+                type="text"
+                name="title"
+                value={formData.title}
+                onChange={handleInputChange}
+                placeholder="Event title"
+                required
+                disabled={loading}
+              />
+              <Form.Control.Feedback type="invalid">
+                Please provide a title
+              </Form.Control.Feedback>
+            </Form.Group>
+            
+            <Form.Group className="mb-3">
+              <Form.Label>Description</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
+                placeholder="Event description"
+                disabled={loading}
+              />
+            </Form.Group>
+            
+            <Row className="mb-3">
+              <Col md={12}>
+                <DatePicker
+                  label="Start Date"
+                  required
+                  value={formData.startDate}
+                  onChange={(date) => handleDateChange('startDate', date)}
+                  id="event-start-date"
+                  isInvalid={validated && !formData.startDate}
+                  invalidMessage="Start date is required"
+                  disabled={loading}
+                />
+              </Col>
+            </Row>
+            
+            <Row className="mb-3">
+              <Col md={12}>
+                <DatePicker
+                  label="End Date"
+                  value={formData.endDate}
+                  onChange={(date) => handleDateChange('endDate', date)}
+                  id="event-end-date"
+                  minDate={formData.startDate}
+                  disabled={loading}
+                />
+              </Col>
+            </Row>
+            
+            <Form.Group className="mb-3">
+              <Form.Label>Event Color</Form.Label>
+              <Form.Control
+                type="color"
+                name="color"
+                value={formData.color}
+                onChange={handleInputChange}
+                title="Choose event color"
+                disabled={loading}
+              />
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Linked Article</Form.Label>
+              <div className="d-flex align-items-center">
+                <span className="linked-article-display me-2">
+                  {linkedArticleTitleDisplay}
+                </span>
+                <Button 
+                  variant="outline-secondary" 
+                  size="sm"
+                  onClick={handleLinkClick}
+                  disabled={loading}
+                  className="me-1"
+                >
+                  <FontAwesomeIcon icon={faLink} className="me-1" />
+                  {formData.articleId ? 'Change' : 'Link'}
+                </Button>
+                {formData.articleId && (
+                  <Button
+                    variant="outline-danger"
+                    size="sm"
+                    onClick={handleUnlinkClick}
+                    disabled={loading}
+                    title="Unlink Article"
+                  >
+                    <FontAwesomeIcon icon={faUnlink} />
+                  </Button>
+                )}
+              </div>
+            </Form.Group>
+          </Modal.Body>
+          
+          <Modal.Footer>
+            {event && event.id && (
+              <Button 
+                variant="danger" 
+                onClick={handleDelete} 
+                disabled={loading} 
+                className="me-auto"
+              >
+                <FontAwesomeIcon icon={faTrashAlt} className="me-1" />
+                Delete
+              </Button>
+            )}
+            <Button variant="secondary" onClick={onHide} disabled={loading}>
+              Cancel
             </Button>
-          )}
-          <Button variant="secondary" onClick={onHide} disabled={loading}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="primary" disabled={loading}>
-            {loading ? 'Saving...' : (event && event.id ? 'Update Event' : 'Create Event')}
-          </Button>
-        </Modal.Footer>
-      </Form>
-    </Modal>
+            <Button type="submit" variant="primary" disabled={loading}>
+              {loading ? 'Saving...' : (event && event.id ? 'Update Event' : 'Create Event')}
+            </Button>
+          </Modal.Footer>
+        </Form>
+      </Modal>
+
+      {showLinkModal && (
+        <ArticleLinkModal
+          articles={articles} 
+          currentArticleId={formData.articleId || null} 
+          onSelectArticle={handleArticleSelected}
+          onClose={() => setShowLinkModal(false)}
+        />
+      )}
+    </>
   );
 };
 

@@ -7,7 +7,7 @@
   top: calc(var(--lane-index, 0) * 60px + 10px); /* 60px = height + gap */
   transform: none; /* Remove translateY(-50%) */
   height: 55px; /* Match image aspect ratio */
-  min-width: 50px; /* Reduced min width for point events */
+  min-width: 50px; /* Minimum width for visibility */
   /* Remove max-width constraint to allow full expansion */
   /* max-width: 400px;  */
   padding: 0 15px; /* Horizontal padding */
@@ -26,9 +26,46 @@
   box-shadow: 0 0 15px 0px var(--item-shadow-color, #3b82f6);
 }
 
+/* Styling for events extending beyond visible range */
+.timeline-item.extends-left {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 2px dashed rgba(255, 255, 255, 0.7);
+  padding-left: 25px; /* Extra padding for the indicator */
+}
+
+.timeline-item.extends-right {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: 2px dashed rgba(255, 255, 255, 0.7);
+  padding-right: 25px; /* Extra padding for the indicator */
+}
+
 .timeline-item:hover {
   transform: scale(1.03); /* Adjust hover transform */
   box-shadow: 0 0 25px 3px var(--item-shadow-color, #3b82f6); /* Enhanced glow */
+}
+
+/* Edge indicators */
+.timeline-item-edge-indicator {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.7;
+  animation: pulse 1.5s infinite alternate ease-in-out;
+}
+
+.timeline-item-edge-indicator.left {
+  left: 5px;
+}
+
+.timeline-item-edge-indicator.right {
+  right: 5px;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.5; }
+  100% { opacity: 1; }
 }
 
 .timeline-item-icon {
@@ -36,7 +73,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Add background or styling if needed */
+  margin-left: 5px; /* Add spacing from left edge/indicator */
 }
 
 .timeline-item-content {
@@ -44,6 +81,8 @@
   flex-direction: column;
   justify-content: center;
   overflow: hidden; /* Prevent content overflow */
+  flex: 1; /* Take available space */
+  min-width: 0; /* Allow content to properly truncate */
 }
 
 .timeline-item-title {

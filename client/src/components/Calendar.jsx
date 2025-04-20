@@ -4,63 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import { useCalendar } from '../contexts/CalendarContext';
 import './Calendar.css';
-
-// --- Copied Helper Function (Ideally move to utils) ---
-const dateToDayNumber = (dateObj, settings, getDaysInMonthFunc) => {
-    // ... (Full implementation of dateToDayNumber as used in HorizontalTimelineView)
-  if (
-    !dateObj ||
-    dateObj.year === undefined ||
-    dateObj.month === undefined ||
-    dateObj.day === undefined ||
-    !settings ||
-    !getDaysInMonthFunc ||
-    dateObj.month < 0 ||
-    dateObj.month >= settings.monthNames.length ||
-    dateObj.day < 1
-  ) {
-    return null; 
-  }
-  let totalDays = 0;
-  const targetYear = dateObj.year;
-  const targetMonth = dateObj.month;
-  const targetDay = dateObj.day;
-  if (targetYear < 1) {
-    return null;
-  }
-  for (let y = 1; y < targetYear; y++) {
-    let daysInYearY = 0;
-    for (let m = 0; m < settings.monthNames.length; m++) {
-      daysInYearY += getDaysInMonthFunc(m, y);
-    }
-    if (!Number.isFinite(daysInYearY)) {
-        return null;
-    }
-    totalDays += daysInYearY;
-     if (totalDays > Number.MAX_SAFE_INTEGER / 2) {
-        totalDays = Number.MAX_SAFE_INTEGER / 2;
-        break;
-     }
-  }
-  for (let m = 0; m < targetMonth; m++) {
-    const daysInMonthM = getDaysInMonthFunc(m, targetYear);
-     if (!Number.isFinite(daysInMonthM)) {
-        return null;
-    }
-    totalDays += daysInMonthM;
-  }
-  const daysInTargetMonth = getDaysInMonthFunc(targetMonth, targetYear);
-  if (targetDay > daysInTargetMonth) {
-      totalDays += daysInTargetMonth;
-  } else {
-       totalDays += targetDay;
-  }
-  if (!Number.isFinite(totalDays)) {
-      return null;
-  }
-  return totalDays > 0 ? totalDays : 1;
-};
-// --- End Helper Function ---
+import { dateToDayNumber } from '../utils/calendarUtils';
 
 const Calendar = ({ onDateSelect, initialDate, minDate = null }) => {
   const { 
@@ -265,11 +209,14 @@ const Calendar = ({ onDateSelect, initialDate, minDate = null }) => {
   
   const finalizeYearChange = () => {
     const yearNum = parseInt(yearInputValue);
-    const newYear = !isNaN(yearNum) && yearNum >= 1 ? yearNum : 1; 
+    // Allow any integer, reset to current year if input is not a valid number
+    const newYear = !isNaN(yearNum) ? yearNum : currentYear; 
     
     if (newYear !== currentYear) {
         setCurrentYear(newYear); 
     } else {
+        // If the resolved year is the same as current, ensure input reflects it
+        // This handles cases where the input was invalid (NaN) and resets to current
         setYearInputValue(String(currentYear)); 
     }
   };
@@ -354,7 +301,6 @@ const Calendar = ({ onDateSelect, initialDate, minDate = null }) => {
               onClick={handleYearInputClick}
               onMouseDown={handleYearInputMouseDown}
               className="calendar-year-input"
-              min="1"
               step="1"
               ref={yearInputRef}
             />

@@ -36,7 +36,6 @@ const TimelinePageContent = () => {
 
   const [showEventForm, setShowEventForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
-  const [showArticleLinkModal, setShowArticleLinkModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false); // State for settings modal
 
   // --- Queries ---
@@ -171,23 +170,6 @@ const TimelinePageContent = () => {
     return saveEventMutation.mutateAsync(eventDataFromForm); 
   };
 
-  // This handler is now triggered by the button within EventForm
-  const handleLinkArticleClick = () => {
-      setShowArticleLinkModal(true);
-  };
-
-  // This is called when an article is selected in the modal
-  const handleModalSelectArticle = (selectedArticle) => {
-      // Update the articleId and title in the editingEvent state
-      setEditingEvent(prev => ({
-          ...prev,
-          articleId: selectedArticle?._id || null,
-          linkedArticleTitle: selectedArticle?.title || ''
-      }));
-      setShowArticleLinkModal(false); // Close the link modal
-      // Keep the EventForm open
-  };
-
   // Handler to pass down for deleting an event
   const handleDeleteEvent = (eventId) => {
     // Optional: Add confirmation here if desired, though it's better in the form
@@ -204,9 +186,6 @@ const TimelinePageContent = () => {
   if (error && !isLoading) { 
     return <Container className="alert alert-danger mt-5">Error loading timeline: {error.message}</Container>;
   }
-
-  // Find the title of the currently linked article for the form
-  const currentEditingArticle = articles.find(a => a._id === editingEvent?.articleId);
 
   return (
     <Container fluid className="timeline-page py-4">
@@ -252,21 +231,9 @@ const TimelinePageContent = () => {
             }}
             event={editingEvent} 
             onEventSaved={handleEventSaved}
-            onDelete={handleDeleteEvent} // Pass the delete handler
-            // Pass handlers and data for article linking
-            onLinkArticleClick={handleLinkArticleClick} 
-            linkedArticleTitle={currentEditingArticle?.title || ''}
+            onDelete={handleDeleteEvent} 
+            articles={articles} // Pass articles list
           />
-      )}
-
-      {/* Article Linking Modal */} 
-      {showArticleLinkModal && (
-        <ArticleLinkModal
-          articles={articles} 
-          currentArticleId={editingEvent?.articleId || null} // Pass current ID from editing event
-          onSelectArticle={handleModalSelectArticle}
-          onClose={() => setShowArticleLinkModal(false)}
-        />
       )}
 
       {/* Conditionally render Calendar Settings Modal */}
