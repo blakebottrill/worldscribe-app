@@ -200,28 +200,28 @@ const HorizontalTimelineView = ({
         const eventDurationDays = endDay - startDay + 1;
         const minVisualDuration = Math.max(1, visibleDaySpan * 0.001);
         const displayDurationDays = Math.max(eventDurationDays, minVisualDuration);
-        let assignedLane = -1;
-        for (let i = 0; i < lanes.length; i++) {
+    let assignedLane = -1;
+    for (let i = 0; i < lanes.length; i++) {
            if (startDay > lanes[i]) {
              lanes[i] = endDay;
-             assignedLane = i;
-             break;
-           }
-        }
-        if (assignedLane === -1) {
+        assignedLane = i;
+        break;
+      }
+    }
+    if (assignedLane === -1) {
           lanes.push(endDay);
-          assignedLane = lanes.length - 1;
-        }
+      assignedLane = lanes.length - 1;
+    }
         const calculatePercentage = (value, total) => (total > 1 ? (value / total) * 100 : 0);
         const leftPercent = calculatePercentage(startOffsetDays, visibleDaySpan);
         const widthPercent = calculatePercentage(displayDurationDays, visibleDaySpan);
-        const style = {
+    const style = {
           left: `${leftPercent}%`,
           width: `${Math.min(widthPercent, 100 - leftPercent)}%`,
-          '--lane-index': assignedLane,
-        };
-        return { originalEvent: event, style };
-    });
+      '--lane-index': assignedLane, 
+    };
+    return { originalEvent: event, style }; 
+  });
     console.timeEnd("Timeline Lane Calculation");
     return { eventLayouts: layouts, totalLanes: lanes.length || 1 }; // Ensure totalLanes is at least 1
   }, [processedEvents, visibleRange.startDay, visibleDaySpan]);
@@ -487,15 +487,15 @@ const HorizontalTimelineView = ({
             marker.position > 0.1 && marker.position < 99.9 && (
                 <div
                     key={`marker-line-${index}`}
-                    className="timeline-century-line"
+            className="timeline-century-line"
                     style={{ left: `${marker.position}%` }}
-                ></div>
+          ></div>
             )
         ))}
-          
+        
         {/* Render Event Items */}
         {eventLayouts.map(({ originalEvent, style }, index) => (
-          <TimelineItem
+          <TimelineItem 
             key={originalEvent._id || `event-${index}`}
             event={originalEvent}
             style={style}
@@ -504,7 +504,7 @@ const HorizontalTimelineView = ({
           />
         ))}
       </div>
-
+      
     </div>
   );
 };

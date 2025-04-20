@@ -74,10 +74,8 @@ const EventForm = ({ show, onHide, event = null, onEventSaved, onDelete, onLinkA
     description: '',
     startDate: null,
     endDate: null,
-    isAllDay: true,
     color: '#4a6de5',
     articleId: null,
-    important: false
   });
   
   const [currentLinkedArticleTitle, setCurrentLinkedArticleTitle] = useState('');
@@ -90,10 +88,8 @@ const EventForm = ({ show, onHide, event = null, onEventSaved, onDelete, onLinkA
         description: event.description || '',
         startDate: event.startDate || null,
         endDate: event.endDate || null,
-        isAllDay: event.isAllDay !== undefined ? event.isAllDay : true,
         color: event.color || '#4a6de5',
         articleId: event.articleId || null,
-        important: event.important || false
       });
       setCurrentLinkedArticleTitle(linkedArticleTitle || '');
     } else {
@@ -122,10 +118,8 @@ const EventForm = ({ show, onHide, event = null, onEventSaved, onDelete, onLinkA
       description: '',
       startDate: null,
       endDate: null,
-      isAllDay: true,
       color: '#4a6de5',
       articleId: null,
-      important: false,
       id: null
     });
     setValidated(false);
@@ -278,18 +272,6 @@ const EventForm = ({ show, onHide, event = null, onEventSaved, onDelete, onLinkA
           </Row>
           
           <Form.Group className="mb-3">
-            <Form.Check
-              type="checkbox"
-              id="all-day-event"
-              label="All day event"
-              name="isAllDay"
-              checked={formData.isAllDay}
-              onChange={handleInputChange}
-              disabled={loading}
-            />
-          </Form.Group>
-          
-          <Form.Group className="mb-3">
             <Form.Label>Event Color</Form.Label>
             <Form.Control
               type="color"
@@ -297,18 +279,6 @@ const EventForm = ({ show, onHide, event = null, onEventSaved, onDelete, onLinkA
               value={formData.color}
               onChange={handleInputChange}
               title="Choose event color"
-              disabled={loading}
-            />
-          </Form.Group>
-          
-          <Form.Group className="mb-3">
-            <Form.Check
-              type="checkbox"
-              id="important-event"
-              label="Mark as important"
-              name="important"
-              checked={formData.important}
-              onChange={handleInputChange}
               disabled={loading}
             />
           </Form.Group>

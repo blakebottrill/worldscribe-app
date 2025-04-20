@@ -79,15 +79,11 @@ const Calendar = ({ onDateSelect, initialDate, minDate = null }) => {
   const [yearInputValue, setYearInputValue] = useState(String(currentYear));
   const yearInputRef = useRef(null);
 
-  // Convert minDate to day number only once or when it changes
+  // Convert minDate to day number
   const minDayNumber = useMemo(() => {
       if (!minDate) return null;
       return dateToDayNumber(minDate, calendarSettings, getDaysInMonth);
   }, [minDate, calendarSettings, getDaysInMonth]);
-
-  // --- DEBUG LOGGING for minDayNumber ---
-  console.log(`[Calendar Render] minDate prop:`, minDate, `Calculated minDayNumber:`, minDayNumber);
-  // --- END DEBUG LOGGING ---
 
   useEffect(() => {
     if (!calendarSettings || loading) return;
@@ -175,27 +171,13 @@ const Calendar = ({ onDateSelect, initialDate, minDate = null }) => {
   };
   
   const handleDateClick = (day) => {
-    // Convert clicked day to day number
     const clickedDayNumber = dateToDayNumber(day, calendarSettings, getDaysInMonth);
     
-    // --- DEBUG LOGGING --- 
-    console.log(`[handleDateClick] Clicked Day: ${day.day}/${day.month}/${day.year}, DayNum: ${clickedDayNumber}, MinDayNum: ${minDayNumber}`);
-    // --- END DEBUG LOGGING --- 
-
-    // Check against minDayNumber
     if (minDayNumber !== null && clickedDayNumber !== null && clickedDayNumber < minDayNumber) {
-        // --- DEBUG LOGGING --- 
-        console.log(`[handleDateClick] Click PREVENTED (before minDate)`);
-        // --- END DEBUG LOGGING --- 
         console.warn("Selected date is before the minimum allowed date.");
-        return; // Prevent selection
+        return; 
     }
 
-    // --- DEBUG LOGGING --- 
-    console.log(`[handleDateClick] Click ALLOWED`);
-    // --- END DEBUG LOGGING --- 
-
-    // If valid, proceed with selection
     const date = {
       day: day.day,
       month: day.month,
@@ -246,31 +228,22 @@ const Calendar = ({ onDateSelect, initialDate, minDate = null }) => {
       rows.push(
         <tr key={i}>
           {weekDays.map((day, index) => {
-            // Calculate if the day is disabled
             let isDisabled = false;
-            let currentDayNumber = null; // Keep track for logging
             if (day.day && minDayNumber !== null) { 
-              currentDayNumber = dateToDayNumber(day, calendarSettings, getDaysInMonth);
+              const currentDayNumber = dateToDayNumber(day, calendarSettings, getDaysInMonth);
               if (currentDayNumber !== null && currentDayNumber < minDayNumber) {
                 isDisabled = true;
               }
             }
             
-            // --- DEBUG LOGGING for isDisabled ---
-            if (day.day) { // Only log for actual days, not empty cells
-                console.log(`[renderCalendarDays] Day: ${day.day}/${day.month}/${day.year}, DayNum: ${currentDayNumber}, minDayNum: ${minDayNumber}, isDisabled: ${isDisabled}`);
-            }
-            // --- END DEBUG LOGGING ---
-
             return (
               <td 
                 key={index} 
                 className={`text-center calendar-day 
                   ${day.isCurrentMonth ? '' : 'other-month'} 
                   ${isSelectedDate(day) ? 'selected' : ''}
-                  ${isDisabled ? 'disabled' : ''} // Add disabled class
+                  ${isDisabled ? 'disabled' : ''} 
                 `}
-                // Only attach onClick if not disabled
                 onClick={() => !isDisabled && day.day && handleDateClick(day)}
               >
                 {day.day}

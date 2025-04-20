@@ -88,7 +88,7 @@
 .calendar-day {
   padding: 0.5rem;
   height: 40px; /* Slightly smaller height */
-  cursor: pointer;
+  cursor: pointer; /* Explicitly set pointer for non-disabled days */
   transition: all 0.2s ease;
   position: relative;
   font-weight: 500;
@@ -127,10 +127,13 @@
   color: #adb5bd; /* Lighter text color */
   background-color: #e9ecef; /* Slightly different background */
   cursor: not-allowed; /* Indicate non-interactive */
-  /* Optional: remove hover effect for disabled days */
-  &:hover {
-    background-color: #e9ecef; 
-  }
+  /* &:hover { ... } */ /* Removed nested syntax */
+}
+
+/* Separate rule for hover effect on disabled days */
+.calendar-day.disabled:hover {
+   background-color: #e9ecef; /* Keep the disabled background on hover */
+   cursor: not-allowed; /* Ensure cursor stays not-allowed on hover */
 }
 
 /* Ensure selected style overrides disabled if somehow selected */
