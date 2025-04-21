@@ -7,8 +7,53 @@
  */
 const getDaysInMonthInternal = (month, year, settings, getDaysInMonthFunc) => {
      if (!settings || !getDaysInMonthFunc) return 30; // Default fallback
-     return getDaysInMonthFunc(month, year); // Use the passed function
+     // Ensure month is within bounds for getDaysInMonthFunc if it expects valid indices
+     if (month < 0 || month >= settings.monthNames.length) {
+         console.warn(`[getDaysInMonthInternal] Invalid month index: ${month}`);
+         return 0; // Or handle as error
+     }
+     try {
+        return getDaysInMonthFunc(month, year); // Use the passed function
+     } catch (e) {
+        console.error(`[getDaysInMonthInternal] Error calling getDaysInMonthFunc(${month}, ${year}):`, e);
+        return 30; // Fallback on error
+     }
 }
+
+// --- Helper to get average days per year (cached) ---
+const averageDaysCache = new Map();
+
+const getAverageDaysInYear = (settings, getDaysInMonthFunc) => {
+    const cacheKey = JSON.stringify({ rule: settings.leapYearRule, offset: settings.leapYearOffset, days: settings.daysPerMonth });
+    if (averageDaysCache.has(cacheKey)) {
+        return averageDaysCache.get(cacheKey);
+    }
+
+    if (!settings || !settings.monthNames || settings.monthNames.length === 0 || !getDaysInMonthFunc) {
+        return 365.25; // Default fallback average
+    }
+
+    let totalDaysInSample = 0;
+    const sampleYears = 400; // Use a large cycle (like Gregorian) to average leap years well
+    const startYear = 1; // Use a positive starting year for simplicity
+
+    for (let y = startYear; y < startYear + sampleYears; y++) {
+        let daysInYearY = 0;
+        for (let m = 0; m < settings.monthNames.length; m++) {
+            daysInYearY += getDaysInMonthInternal(m, y, settings, getDaysInMonthFunc);
+        }
+         if (!Number.isFinite(daysInYearY)) {
+             console.warn(`[getAverageDaysInYear] Non-finite days calculated for year ${y}. Using fallback average.`);
+             averageDaysCache.set(cacheKey, 365.25);
+             return 365.25;
+         }
+        totalDaysInSample += daysInYearY;
+    }
+
+    const average = totalDaysInSample / sampleYears;
+    averageDaysCache.set(cacheKey, average);
+    return average;
+};
 
 
 /**
@@ -31,6 +76,8 @@ export const dateToDayNumber = (dateObj, settings, getDaysInMonthFunc) => {
     dateObj.day === undefined ||
     !settings ||
     !getDaysInMonthFunc ||
+    !settings.monthNames || // Added check
+    settings.monthNames.length === 0 || // Added check
     dateObj.month < 0 ||
     dateObj.month >= settings.monthNames.length ||
     dateObj.day < 1
@@ -45,66 +92,76 @@ export const dateToDayNumber = (dateObj, settings, getDaysInMonthFunc) => {
 
   // --- Calculation ---
   let totalDays = 0;
+  const numMonths = settings.monthNames.length;
 
+  // Use the calculation logic based on year 1 = day 1
   if (targetYear >= 1) {
-    // --- Forward Calculation (Years >= 1) ---
-    // Days from Year 1 up to targetYear
-    for (let y = 1; y < targetYear; y++) {
-      let daysInYearY = 0;
-      for (let m = 0; m < settings.monthNames.length; m++) {
-        daysInYearY += getDaysInMonthInternal(m, y, settings, getDaysInMonthFunc);
+      // Calculate days for full years before targetYear
+      if (targetYear > 1) {
+          // More optimized calculation for full years:
+          // Instead of looping year by year, calculate directly if possible,
+          // especially if leap year rules are simple.
+          // For complex rules, might still need iteration or a better formula.
+          // Let's keep the year loop for now but acknowledge it's the bottleneck.
+          // TODO: Optimize this loop further based on leap year rule predictability
+          for (let y = 1; y < targetYear; y++) {
+              let daysInYearY = 0;
+              for (let m = 0; m < numMonths; m++) {
+                  daysInYearY += getDaysInMonthInternal(m, y, settings, getDaysInMonthFunc);
+              }
+              if (!Number.isFinite(daysInYearY)) return null;
+              totalDays += daysInYearY;
+              // Add clamping or overflow check if necessary for extremely large years
+              if (!Number.isFinite(totalDays) || Math.abs(totalDays) > Number.MAX_SAFE_INTEGER / 2 ) {
+                   console.warn(`[dateToDayNumber] Potential overflow calculating year ${y}`);
+                   return (totalDays > 0 ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER) / 2;
+              }
+          }
       }
-      if (!Number.isFinite(daysInYearY)) return null;
-      totalDays += daysInYearY;
-      if (totalDays > Number.MAX_SAFE_INTEGER / 2) { /* Clamp */ totalDays = Number.MAX_SAFE_INTEGER / 2; break; }
-    }
+      // Days from start of targetYear up to targetMonth
+      for (let m = 0; m < targetMonth; m++) {
+          const daysInMonthM = getDaysInMonthInternal(m, targetYear, settings, getDaysInMonthFunc);
+          if (!Number.isFinite(daysInMonthM)) return null;
+          totalDays += daysInMonthM;
+      }
+      // Add days in targetMonth (clamped)
+      const daysInTargetMonth = getDaysInMonthInternal(targetMonth, targetYear, settings, getDaysInMonthFunc);
+      totalDays += Math.min(targetDay, daysInTargetMonth);
 
-    // Days from start of targetYear up to targetMonth
-    for (let m = 0; m < targetMonth; m++) {
-      const daysInMonthM = getDaysInMonthInternal(m, targetYear, settings, getDaysInMonthFunc);
-      if (!Number.isFinite(daysInMonthM)) return null;
-      totalDays += daysInMonthM;
-    }
-
-    // Add days in targetMonth (clamped)
-    const daysInTargetMonth = getDaysInMonthInternal(targetMonth, targetYear, settings, getDaysInMonthFunc);
-    totalDays += Math.min(targetDay, daysInTargetMonth);
-
-  } else {
-    // --- Backward Calculation (Years <= 0) ---
-    // Start from Day 1 of Year 1 (which is day number 1) and subtract days for Year 0, -1, etc.
-    // Day number 0 is the day *before* Day 1 of Year 1.
-    totalDays = 1; // Start point
-
-    for (let y = 0; y >= targetYear; y--) { // Loop from Year 0 down to targetYear
-        let daysInYearY = 0;
-        for (let m = 0; m < settings.monthNames.length; m++) {
-            daysInYearY += getDaysInMonthInternal(m, y, settings, getDaysInMonthFunc);
-        }
-         if (!Number.isFinite(daysInYearY)) return null;
-         totalDays -= daysInYearY; // Subtract days in this past year
-         // Safety break
-         if (totalDays < Number.MIN_SAFE_INTEGER / 2) { /* Clamp */ totalDays = Number.MIN_SAFE_INTEGER / 2; break; }
-    }
-
-    // Now, add days from the start of targetYear up to the target date
-    // (effectively reducing the subtraction)
-     for (let m = 0; m < targetMonth; m++) {
-        const daysInMonthM = getDaysInMonthInternal(m, targetYear, settings, getDaysInMonthFunc);
-        if (!Number.isFinite(daysInMonthM)) return null;
-        totalDays += daysInMonthM;
-     }
-     const daysInTargetMonth = getDaysInMonthInternal(targetMonth, targetYear, settings, getDaysInMonthFunc);
-     totalDays += Math.min(targetDay, daysInTargetMonth);
-
+  } else { // targetYear <= 0
+      // Calculation for year 0 and negative years
+      // Start from day 1 (start of year 1) and subtract days backwards
+      totalDays = 1;
+      // TODO: Optimize this loop similar to the forward calculation
+      for (let y = 0; y >= targetYear; y--) {
+          let daysInYearY = 0;
+          for (let m = 0; m < numMonths; m++) {
+              daysInYearY += getDaysInMonthInternal(m, y, settings, getDaysInMonthFunc);
+          }
+          if (!Number.isFinite(daysInYearY)) return null;
+          totalDays -= daysInYearY; // Subtract days for this past year
+           // Add clamping or overflow check
+           if (!Number.isFinite(totalDays) || Math.abs(totalDays) > Number.MAX_SAFE_INTEGER / 2 ) {
+               console.warn(`[dateToDayNumber] Potential overflow calculating year ${y}`);
+               return (totalDays > 0 ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER) / 2;
+           }
+      }
+      // Add back days from the start of targetYear up to the target date
+      for (let m = 0; m < targetMonth; m++) {
+          const daysInMonthM = getDaysInMonthInternal(m, targetYear, settings, getDaysInMonthFunc);
+          if (!Number.isFinite(daysInMonthM)) return null;
+          totalDays += daysInMonthM;
+      }
+      const daysInTargetMonth = getDaysInMonthInternal(targetMonth, targetYear, settings, getDaysInMonthFunc);
+      totalDays += Math.min(targetDay, daysInTargetMonth);
   }
-
 
   if (!Number.isFinite(totalDays)) {
-    return null;
+      console.warn("[dateToDayNumber] Result is not finite:", totalDays);
+      return null;
   }
-
-  return totalDays;
+  // Clamp final result
+  return Math.max(Number.MIN_SAFE_INTEGER, Math.min(Number.MAX_SAFE_INTEGER, totalDays));
 };
 
 
@@ -243,103 +300,136 @@ export const addDaysToDate = (dateObj, daysToAdd, settings, getDaysInMonthFunc) 
  * @returns {object|null} Date object { year, month, day } or null if input is invalid/unrepresentable.
  */
 export const dayNumberToDate = (dayNumber, settings, getDaysInMonthFunc) => {
+    // --- Input Validation ---
     if (
         dayNumber === undefined || dayNumber === null || !Number.isFinite(dayNumber) ||
         !settings || !settings.monthNames || settings.monthNames.length === 0 ||
         !getDaysInMonthFunc
     ) {
-        console.warn("[dayNumberToDate] Invalid input", { dayNumber, settings: !!settings, getDaysInMonthFunc: !!getDaysInMonthFunc });
+        console.warn("[dayNumberToDate] Invalid input:", { dayNumber, settings: !!settings, getDaysInMonthFunc: !!getDaysInMonthFunc });
         return null;
     }
 
-    const numMonthsInYear = settings.monthNames.length;
-    let remainingDays = dayNumber;
-    let currentYear;
+    // Clamp input day number for safety
+    dayNumber = Math.max(Number.MIN_SAFE_INTEGER, Math.min(Number.MAX_SAFE_INTEGER, dayNumber));
 
-    // --- Determine Year --- 
-    if (remainingDays >= 1) {
-        // --- Forward Calculation (Years >= 1) ---
-        currentYear = 1;
-        while (true) {
-            let daysInCurrentYear = 0;
-            for (let m = 0; m < numMonthsInYear; m++) {
-                daysInCurrentYear += getDaysInMonthInternal(m, currentYear, settings, getDaysInMonthFunc);
-            }
-            if (!Number.isFinite(daysInCurrentYear) || daysInCurrentYear <= 0) {
-                 console.error("[dayNumberToDate] Invalid days in year", { currentYear, daysInCurrentYear });
-                 return null; // Invalid calendar data
-            }
-            
-            if (remainingDays <= daysInCurrentYear) {
-                break; // Found the target year
-            }
-            remainingDays -= daysInCurrentYear;
-            currentYear++;
-            // Safety break for extremely large day numbers
-            if (currentYear > 100000) { 
-                 console.warn("[dayNumberToDate] Reached year limit (100,000)");
-                 return null; 
-            }
+    const numMonths = settings.monthNames.length;
+    const avgDays = getAverageDaysInYear(settings, getDaysInMonthFunc);
+    if (avgDays <= 0) { // Avoid division by zero or infinite loops
+         console.error("[dayNumberToDate] Average days per year is non-positive. Cannot proceed.", avgDays);
+         return null;
+    }
+
+    // --- Estimate Year ---
+    // Adjust dayNumber relative to the start of year 1 (which is day 1)
+    const adjustedDayNumber = dayNumber - 1;
+    let estimatedYear = 1 + Math.floor(adjustedDayNumber / avgDays);
+
+    // --- Refine Year ---
+    // Find the day number for the start of the estimated year
+    let currentYear = estimatedYear;
+    let startDayOfCurrentYear = dateToDayNumber({ year: currentYear, month: 0, day: 1 }, settings, getDaysInMonthFunc);
+
+    // Check if dateToDayNumber failed
+    if (startDayOfCurrentYear === null) {
+        console.error(`[dayNumberToDate] Failed to calculate start day for estimated year ${currentYear}`);
+        // Attempt a safe fallback or return null
+        // Fallback: try year 1 if dayNumber is positive, year 0 otherwise
+        currentYear = dayNumber > 0 ? 1 : 0;
+        startDayOfCurrentYear = dateToDayNumber({ year: currentYear, month: 0, day: 1 }, settings, getDaysInMonthFunc);
+        if (startDayOfCurrentYear === null) return null; // Give up if even fallback fails
+    }
+
+    // Iterate forwards or backwards from the estimate to find the correct year
+    // Safety limits to prevent infinite loops in case of logic errors
+    const maxYearIteration = 10; // Usually 1 or 2 iterations should be enough
+    let iterations = 0;
+
+    if (dayNumber >= startDayOfCurrentYear) {
+        // Target day is in or after estimated year, iterate forward
+        while (iterations < maxYearIteration) {
+             let daysInCurrentYear = 0;
+             for (let m = 0; m < numMonths; m++) {
+                 daysInCurrentYear += getDaysInMonthInternal(m, currentYear, settings, getDaysInMonthFunc);
+             }
+             if (!Number.isFinite(daysInCurrentYear) || daysInCurrentYear <= 0) {
+                 console.error(`[dayNumberToDate] Invalid days calculated for year ${currentYear}`);
+                 return null; // Cannot proceed if year length is invalid
+             }
+
+             const startDayOfNextYear = startDayOfCurrentYear + daysInCurrentYear;
+             if (dayNumber < startDayOfNextYear) {
+                 break; // Found the correct year
+             }
+             startDayOfCurrentYear = startDayOfNextYear;
+             currentYear++;
+             iterations++;
         }
     } else {
-        // --- Backward Calculation (Years <= 0) ---
-        // Day number 0 is the last day of Year 0.
-        // Day number -X means X days *before* Day 1 of Year 1.
-        currentYear = 0;
-        while (true) {
-             let daysInYearBefore = 0;
-            for (let m = 0; m < numMonthsInYear; m++) {
-                daysInYearBefore += getDaysInMonthInternal(m, currentYear, settings, getDaysInMonthFunc);
-            }
-            if (!Number.isFinite(daysInYearBefore) || daysInYearBefore <= 0) {
-                 console.error("[dayNumberToDate] Invalid days in year", { currentYear, daysInYearBefore });
-                 return null; // Invalid calendar data
-            }
+        // Target day is before estimated year, iterate backward
+        while (iterations < maxYearIteration) {
+             let daysInPreviousYear = 0;
+             const previousYear = currentYear - 1;
+             for (let m = 0; m < numMonths; m++) {
+                 daysInPreviousYear += getDaysInMonthInternal(m, previousYear, settings, getDaysInMonthFunc);
+             }
+              if (!Number.isFinite(daysInPreviousYear) || daysInPreviousYear <= 0) {
+                 console.error(`[dayNumberToDate] Invalid days calculated for year ${previousYear}`);
+                 return null; // Cannot proceed if year length is invalid
+              }
 
-            if (remainingDays + daysInYearBefore > 0) {
-                // The target day falls within currentYear (which is <= 0)
-                // Adjust remainingDays to be relative to the start of currentYear
-                remainingDays += daysInYearBefore;
-                break;
-            }
-             remainingDays += daysInYearBefore; // Add days of this year (effectively subtracting from the negative count)
-            currentYear--;
-            // Safety break for extremely negative day numbers
-            if (currentYear < -100000) { 
-                 console.warn("[dayNumberToDate] Reached negative year limit (-100,000)");
-                 return null; 
-            }
+             const startDayOfPreviousYear = startDayOfCurrentYear - daysInPreviousYear;
+             if (dayNumber >= startDayOfPreviousYear) {
+                 // Found the correct year (which is previousYear)
+                 currentYear = previousYear;
+                 startDayOfCurrentYear = startDayOfPreviousYear;
+                 break;
+             }
+             startDayOfCurrentYear = startDayOfPreviousYear;
+             currentYear--; // Should be previousYear, decrementing for next loop check
+             iterations++;
         }
     }
 
-    // --- Determine Month and Day --- 
-    let currentMonth = 0;
-    for (let m = 0; m < numMonthsInYear; m++) {
-        const daysInCurrentMonth = getDaysInMonthInternal(m, currentYear, settings, getDaysInMonthFunc);
-        if (!Number.isFinite(daysInCurrentMonth)) return null;
-
-        if (remainingDays <= daysInCurrentMonth) {
-            currentMonth = m;
-            break; 
-        }
-        remainingDays -= daysInCurrentMonth;
-        // If we exit the loop because m >= numMonthsInYear, something is wrong
-        if (m === numMonthsInYear - 1 && remainingDays > 0) {
-            console.error("[dayNumberToDate] Remaining days after checking all months", { remainingDays, currentYear });
-            return null; 
-        }
-    }
-
-    const finalDay = remainingDays; // remainingDays should now be the day within the month
-
-    // Final validation of the day
-     const daysInFinalMonth = getDaysInMonthInternal(currentMonth, currentYear, settings, getDaysInMonthFunc);
-     if (finalDay < 1 || finalDay > daysInFinalMonth) {
-         console.error("[dayNumberToDate] Calculated day out of bounds", { finalDay, currentMonth, currentYear, daysInFinalMonth });
-         return null; // Day doesn't exist in the calculated month
+     if (iterations >= maxYearIteration) {
+         console.warn(`[dayNumberToDate] Exceeded max iterations (${maxYearIteration}) refining year for dayNumber ${dayNumber}. Result might be inaccurate.`);
+         // Continue with the last calculated year, but log warning
      }
 
-    return { year: currentYear, month: currentMonth, day: Math.round(finalDay) }; // Round day just in case of floating point issues
+    // --- Calculate Month and Day ---
+    let remainingDays = dayNumber - startDayOfCurrentYear; // Days *within* the currentYear (0-indexed)
+    let currentMonth = 0;
+
+    for (let m = 0; m < numMonths; m++) {
+        const daysInMonthM = getDaysInMonthInternal(m, currentYear, settings, getDaysInMonthFunc);
+         if (!Number.isFinite(daysInMonthM) || daysInMonthM < 0) {
+             console.error(`[dayNumberToDate] Invalid days (${daysInMonthM}) for month ${m}, year ${currentYear}`);
+             return null; // Cannot proceed
+         }
+        if (remainingDays < daysInMonthM) {
+            currentMonth = m;
+            break;
+        }
+        remainingDays -= daysInMonthM;
+        // Handle case where dayNumber lands exactly on the last day of the last month
+        if (m === numMonths - 1 && remainingDays === 0) {
+             currentMonth = m;
+             break;
+        }
+    }
+
+    // Day is 1-indexed
+    const currentDay = remainingDays + 1;
+
+    // Final validation on the day
+    const finalDaysInMonth = getDaysInMonthInternal(currentMonth, currentYear, settings, getDaysInMonthFunc);
+    if(currentDay < 1 || currentDay > finalDaysInMonth) {
+         console.error(`[dayNumberToDate] Calculated day ${currentDay} is out of bounds (1-${finalDaysInMonth}) for month ${currentMonth}, year ${currentYear}. Input dayNumber: ${dayNumber}`);
+         // Attempt to clamp or return null
+         return { year: currentYear, month: currentMonth, day: Math.max(1, Math.min(currentDay, finalDaysInMonth)) }; // Clamp as fallback
+    }
+
+    return { year: currentYear, month: currentMonth, day: currentDay };
 };
 
 
