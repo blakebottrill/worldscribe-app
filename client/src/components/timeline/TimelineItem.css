@@ -18,12 +18,19 @@
   color: white;
   cursor: pointer;
   border: 1px solid rgba(255, 255, 255, 0.3); /* Slightly more visible border */
-  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
   white-space: nowrap; /* Prevent text wrapping */
   overflow: hidden; /* Hide overflow */
   /* Use a CSS variable for the item color */
   background-color: var(--item-bg-color, #3b82f6);
   box-shadow: 0 0 15px 0px var(--item-shadow-color, #3b82f6);
+  
+  /* Add smooth transitions for lane changes and other property changes */
+  transition: 
+    transform 0.2s ease-out, 
+    box-shadow 0.2s ease-out,
+    top 0.3s ease-in-out,
+    left 0.2s ease-out,
+    width 0.2s ease-out;
 }
 
 /* Styling for events extending beyond visible range */
@@ -44,6 +51,7 @@
 .timeline-item:hover {
   transform: scale(1.03); /* Adjust hover transform */
   box-shadow: 0 0 25px 3px var(--item-shadow-color, #3b82f6); /* Enhanced glow */
+  z-index: 100; /* Ensure hovered items appear above others */
 }
 
 /* Edge indicators */
@@ -118,4 +126,29 @@
 
 .timeline-item-handle.right {
   right: 5px;
+}
+
+/* --- Transition Styles for Exiting Items --- */
+
+.timeline-item.is-exiting {
+  opacity: 0;
+  pointer-events: none; /* Disable interaction while exiting */
+  /* Define transition properties - match duration with EXIT_TRANSITION_DURATION in JS */
+  transition: 
+    opacity 0.3s ease-out, 
+    transform 0.3s ease-out, 
+    /* Include existing transitions if needed, ensure durations match or coordinate */
+    top 0.3s ease-in-out, 
+    left 0.2s ease-out, 
+    width 0.2s ease-out;
+}
+
+.timeline-item.is-exiting.exiting-left {
+  /* Slide out to the left */
+  transform: translateX(-60px); /* Adjust distance as needed */
+}
+
+.timeline-item.is-exiting.exiting-right {
+  /* Slide out to the right */
+  transform: translateX(60px); /* Adjust distance as needed */
 } 

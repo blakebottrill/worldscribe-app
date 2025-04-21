@@ -19,13 +19,16 @@ const areDatesEqual = (date1, date2) => {
 
 // Updated props: event, style, onClick (instead of onSelectEvent), formatDate
 // Added props: extendsLeft and extendsRight flags
+// New props: isExiting and exitingDirection
 const TimelineItem = ({ 
   event, 
   style, 
   onClick, 
   formatDate, 
   extendsLeft = false, 
-  extendsRight = false 
+  extendsRight = false,
+  isExiting = false, 
+  exitingDirection = 'left'
 }) => {
   // Use title, startDate, endDate from the event object
   const { title, startDate, endDate, icon, color, article } = event; 
@@ -58,22 +61,29 @@ const TimelineItem = ({
       }
   };
 
+  // Determine CSS classes based on state
+  const itemClasses = [
+    'timeline-item',
+    article?._id ? 'has-link' : '',
+    onClick ? 'clickable' : '',
+    extendsLeft ? 'extends-left' : '',
+    extendsRight ? 'extends-right' : '',
+    isExiting ? 'is-exiting' : '',
+    isExiting ? `exiting-${exitingDirection}` : ''
+  ].filter(Boolean).join(' '); // Filter out empty strings and join
+
   return (
     <div 
-      // Add CSS classes based on extends flags
-      className={`
-        timeline-item 
-        ${article?._id ? 'has-link' : ''} 
-        clickable
-        ${extendsLeft ? 'extends-left' : ''}
-        ${extendsRight ? 'extends-right' : ''}
-      `}
+      className={itemClasses} // Use the dynamic class string
       style={itemStyle} 
       onClick={handleItemClick} 
-      title={`${title || 'Untitled Event'} (${formatDateRange()})`} 
+      title={`${title || 'Untitled Event'} (${formatDateRange()})`}
+      data-event-id={event._id || ''}
+      data-event-start={event.startDayNumber}
+      data-event-end={event.endDayNumber}
     >
       {/* Left edge indicator if the event extends beyond visible range */}
-      {extendsLeft && (
+      {extendsLeft && !isExiting && (
         <div className="timeline-item-edge-indicator left">
           {renderIcon('FaAngleLeft', '1.5em')}
         </div>
@@ -89,7 +99,7 @@ const TimelineItem = ({
       </div>
       
       {/* Right edge indicator if the event extends beyond visible range */}
-      {extendsRight && (
+      {extendsRight && !isExiting && (
         <div className="timeline-item-edge-indicator right">
           {renderIcon('FaAngleRight', '1.5em')}
         </div>
