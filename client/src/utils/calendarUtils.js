@@ -24,7 +24,13 @@ const getDaysInMonthInternal = (month, year, settings, getDaysInMonthFunc) => {
 const averageDaysCache = new Map();
 
 const getAverageDaysInYear = (settings, getDaysInMonthFunc) => {
-    const cacheKey = JSON.stringify({ rule: settings.leapYearRule, offset: settings.leapYearOffset, days: settings.daysPerMonth });
+    // Include leapDayMonthIndex in the cache key
+    const cacheKey = JSON.stringify({ 
+        rule: settings.leapYearRule, 
+        offset: settings.leapYearOffset, 
+        days: settings.daysPerMonth, 
+        leapMonth: settings.leapDayMonthIndex 
+    });
     if (averageDaysCache.has(cacheKey)) {
         return averageDaysCache.get(cacheKey);
     }

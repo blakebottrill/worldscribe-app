@@ -1,10 +1,47 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Button, Modal, Form, Card, Row, Col, Tab, Tabs, Alert } from 'react-bootstrap';
+import { Button, Modal, Form, Card, Row, Col, Tab, Tabs, Alert, Stack, InputGroup } from 'react-bootstrap';
 import { useCalendar } from '../contexts/CalendarContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlusCircle, faMinusCircle, faCalendarAlt } from '@fortawesome/free-solid-svg-icons';
+import { faPlusCircle, faMinusCircle, faCalendarAlt, faUndo } from '@fortawesome/free-solid-svg-icons';
 import './CalendarSettings.css';
 import ErasSettingsTab from './settings/ErasSettingsTab';
+
+// --- Calendar Templates ---
+
+// Gregorian Calendar Template
+const gregorianTemplate = {
+  dayNames: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+  monthNames: [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ],
+  daysPerMonth: [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
+  leapYearRule: 'standard',
+  leapYearOffset: 4, 
+  firstDayOfWeek: 0, // Sunday
+  leapDayMonthIndex: 1, // February
+};
+
+// Calendar of Harptos Template (Forgotten Realms)
+const harptosTemplate = {
+  dayNames: [
+    'First-day', 'Second-day', 'Third-day', 'Fourth-day', 'Fifth-day',
+    'Sixth-day', 'Seventh-day', 'Eighth-day', 'Ninth-day', 'Tenth-day'
+  ],
+  monthNames: [
+    'Hammer', 'Midwinter', 'Alturiak', 'Ches', 'Tarsakh',
+    'Greengrass', 'Mirtul', 'Kythorn', 'Flamerule', 'Midsummer',
+    'Eleasis', 'Eleint', 'Highharvestide', 'Marpenoth', 'Uktar',
+    'The Feast of the Moon', 'Nightal'
+  ],
+  daysPerMonth: [30, 1, 30, 30, 30, 1, 30, 30, 30, 1, 30, 30, 1, 30, 30, 1, 30],
+  leapYearRule: 'custom',
+  leapYearOffset: 4,
+  firstDayOfWeek: 0, // First-day
+  leapDayMonthIndex: 9, // Midsummer (index 9 in the updated array)
+};
+
+// --- Component Start ---
 
 const CalendarSettings = ({ show, onHide }) => {
   const { calendarSettings, saveCalendarSettings, loading } = useCalendar();
@@ -18,11 +55,31 @@ const CalendarSettings = ({ show, onHide }) => {
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
+    // When the modal is shown or the base settings change, reset local state
     setLocalSettings({
         ...calendarSettings,
-        eras: calendarSettings.eras || []
+        eras: calendarSettings.eras || [] // Preserve existing eras
     });
+    setErrors({}); // Clear errors when modal opens/resets
+    setActiveTab('days'); // Reset to first tab
   }, [calendarSettings, show]);
+
+  // --- Load Template Handler ---
+  const loadTemplate = (template) => {
+      setLocalSettings(prev => ({
+          // Keep existing world-specific stuff like _id, worldId if they exist
+          ...(prev._id && { _id: prev._id }), 
+          ...(prev.worldId && { worldId: prev.worldId }), 
+          // Apply template settings
+          ...template,
+          // Keep existing eras unless template explicitly clears them (it doesn't)
+          eras: prev.eras || [] 
+      }));
+      setErrors({}); // Clear validation errors after loading template
+      // Optionally switch to a relevant tab, e.g., months, or stay put
+      // setActiveTab('months'); 
+      alert('Calendar template loaded. Review settings before saving.'); // Inform user
+  };
 
   const handleSave = async () => {
     if (validateSettings()) {
@@ -157,11 +214,19 @@ const CalendarSettings = ({ show, onHide }) => {
     }));
   };
 
-  const handleFirstDayOfWeekChange = (day) => {
+  const handleFirstDayOfWeekChange = (dayIndex) => {
     setLocalSettings(prev => ({
       ...prev,
-      firstDayOfWeek: parseInt(day)
+      firstDayOfWeek: parseInt(dayIndex)
     }));
+  };
+
+  // --- NEW Handler for Leap Day Month ---
+  const handleLeapDayMonthChange = (monthIndex) => {
+      setLocalSettings(prev => ({
+          ...prev,
+          leapDayMonthIndex: parseInt(monthIndex) || 0 // Default to first month if invalid
+      }));
   };
 
   // --- Handler for updating eras (passed down to ErasSettingsTab) ---
@@ -179,6 +244,7 @@ const CalendarSettings = ({ show, onHide }) => {
       size="lg"
       centered
       className="calendar-settings-modal"
+      scrollable // Make modal body scrollable if content overflows
     >
       <Modal.Header closeButton>
         <Modal.Title>
@@ -187,156 +253,230 @@ const CalendarSettings = ({ show, onHide }) => {
         </Modal.Title>
       </Modal.Header>
       <Modal.Body>
+        {/* --- Settings Tabs (Templates section moved inside) --- */}
         <Tabs
           activeKey={activeTab}
           onSelect={(k) => setActiveTab(k)}
           id="calendar-settings-tabs"
-          className="mb-3"
+          className="mb-3 settings-tabs" 
           fill
         >
+          {/* Days of Week Tab */}
           <Tab eventKey="days" title="Days of Week">
             <Card>
               <Card.Body>
                 <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h5>Days of Week</h5>
-                  <Button variant="primary" onClick={handleAddDay}>
+                  <h6>Day Names</h6>
+                  <Button variant="success" size="sm" onClick={handleAddDay}>
                     <FontAwesomeIcon icon={faPlusCircle} className="me-1" /> Add Day
                   </Button>
                 </div>
-                {errors.dayNames && <Alert variant="danger">{errors.dayNames}</Alert>}
-                {localSettings.dayNames.map((day, index) => (
-                  <div key={index} className="d-flex align-items-center mb-2">
+                {errors.dayNames && <Alert variant="danger" size="sm">{errors.dayNames}</Alert>}
+                {(localSettings.dayNames || []).map((day, index) => (
+                  <InputGroup key={index} className="mb-2">
                     <Form.Control
                       type="text"
                       value={day}
                       onChange={(e) => handleDayNameChange(index, e.target.value)}
-                      className="me-2"
+                      placeholder={`Day ${index + 1} Name`}
                     />
-                    <Button
-                      variant="danger"
-                      onClick={() => handleRemoveDay(index)}
-                      disabled={localSettings.dayNames.length <= 1}
-                    >
+                    <Button variant="danger" size="sm" onClick={() => handleRemoveDay(index)} disabled={(localSettings.dayNames || []).length <= 1}>
                       <FontAwesomeIcon icon={faMinusCircle} />
                     </Button>
-                  </div>
+                  </InputGroup>
                 ))}
-                <Form.Group className="mt-3">
-                  <Form.Label>First Day of Week</Form.Label>
-                  <Form.Select
-                    value={localSettings.firstDayOfWeek}
-                    onChange={(e) => handleFirstDayOfWeekChange(e.target.value)}
-                  >
-                    {localSettings.dayNames.map((day, index) => (
-                      <option key={index} value={index}>
-                        {day}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
+                {(localSettings.dayNames || []).length === 0 && <Alert variant="warning" size="sm">Add at least one day.</Alert>}
+                
+                <hr />
+                <h6>First Day of Week</h6>
+                 {errors.firstDayOfWeek && <Alert variant="danger" size="sm">{errors.firstDayOfWeek}</Alert>}
+                <Form.Select 
+                  aria-label="First day of week"
+                  value={localSettings.firstDayOfWeek || 0}
+                  onChange={(e) => handleFirstDayOfWeekChange(e.target.value)}
+                  disabled={(localSettings.dayNames || []).length === 0}
+                >
+                  {(localSettings.dayNames || []).map((day, index) => (
+                    <option key={index} value={index}>{day}</option>
+                  ))}
+                </Form.Select>
               </Card.Body>
             </Card>
           </Tab>
+
+          {/* Months Tab */}
           <Tab eventKey="months" title="Months">
-            <Card>
+              <Card>
               <Card.Body>
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h5>Months of Year</h5>
-                  <Button variant="primary" onClick={handleAddMonth}>
+                 <div className="d-flex justify-content-between align-items-center mb-3">
+                  <h6>Months & Days</h6>
+                  <Button variant="success" size="sm" onClick={handleAddMonth}>
                     <FontAwesomeIcon icon={faPlusCircle} className="me-1" /> Add Month
                   </Button>
                 </div>
-                {errors.monthNames && <Alert variant="danger">{errors.monthNames}</Alert>}
-                {errors.daysPerMonth && <Alert variant="danger">{errors.daysPerMonth}</Alert>}
-                {localSettings.monthNames.map((month, index) => (
-                  <Row key={index} className="mb-2 align-items-center">
-                    <Col xs={7}>
+                {errors.monthNames && <Alert variant="danger" size="sm">{errors.monthNames}</Alert>}
+                {errors.daysPerMonth && <Alert variant="danger" size="sm">{errors.daysPerMonth}</Alert>}
+                {(localSettings.monthNames || []).map((month, index) => (
+                  <Row key={index} className="mb-2 gx-2 align-items-center">
+                    <Col>
                       <Form.Control
                         type="text"
                         value={month}
                         onChange={(e) => handleMonthNameChange(index, e.target.value)}
-                        placeholder="Month name"
+                        placeholder={`Month ${index + 1} Name`}
+                        size="sm"
                       />
                     </Col>
                     <Col xs={3}>
-                      <Form.Control
-                        type="number"
-                        value={localSettings.daysPerMonth[index]}
-                        onChange={(e) => handleDaysPerMonthChange(index, e.target.value)}
-                        min="1"
-                        placeholder="Days"
-                      />
+                      <InputGroup size="sm">
+                         <Form.Control
+                           type="number"
+                           value={localSettings.daysPerMonth[index]}
+                           onChange={(e) => handleDaysPerMonthChange(index, e.target.value)}
+                           placeholder="Days"
+                           min="1"
+                         />
+                         <InputGroup.Text>days</InputGroup.Text>
+                      </InputGroup>
                     </Col>
-                    <Col xs={2}>
-                      <Button
-                        variant="danger"
-                        onClick={() => handleRemoveMonth(index)}
-                        disabled={localSettings.monthNames.length <= 1}
-                      >
+                    <Col xs="auto">
+                      <Button variant="danger" size="sm" onClick={() => handleRemoveMonth(index)} disabled={(localSettings.monthNames || []).length <= 1}>
                         <FontAwesomeIcon icon={faMinusCircle} />
                       </Button>
                     </Col>
                   </Row>
                 ))}
+                 {(localSettings.monthNames || []).length === 0 && <Alert variant="warning" size="sm">Add at least one month.</Alert>}
               </Card.Body>
             </Card>
           </Tab>
+
+          {/* Leap Years Tab */}
           <Tab eventKey="leap" title="Leap Years">
-            <Card>
+             <Card>
               <Card.Body>
-                <h5>Leap Year Settings</h5>
+                <h6>Leap Year Rule</h6>
+                 {errors.leapYearRule && <Alert variant="danger" size="sm">{errors.leapYearRule}</Alert>}
+                 {errors.leapYearOffset && <Alert variant="danger" size="sm">{errors.leapYearOffset}</Alert>}
+                 {errors.leapDayMonthIndex && <Alert variant="danger" size="sm">{errors.leapDayMonthIndex}</Alert>}
                 <Form.Group className="mb-3">
-                  <Form.Label>Leap Year Rules</Form.Label>
-                  <Form.Select
-                    value={localSettings.leapYearRule}
+                  <Form.Check
+                    type="radio"
+                    id="leap-standard"
+                    label="Standard Gregorian (Every 4 years, except 100 unless divisible by 400)"
+                    value="standard"
+                    checked={localSettings.leapYearRule === 'standard'}
                     onChange={(e) => handleLeapYearRuleChange(e.target.value)}
-                  >
-                    <option value="standard">Standard (Earth-like)</option>
-                    <option value="none">None (No leap years)</option>
-                    <option value="custom">Custom</option>
-                  </Form.Select>
+                  />
+                  <Form.Check
+                    type="radio"
+                    id="leap-custom"
+                    label="Custom Interval (Every N years)"
+                    value="custom"
+                    checked={localSettings.leapYearRule === 'custom'}
+                    onChange={(e) => handleLeapYearRuleChange(e.target.value)}
+                  />
+                  <Form.Check
+                    type="radio"
+                    id="leap-none"
+                    label="No Leap Years"
+                    value="none"
+                    checked={localSettings.leapYearRule === 'none'}
+                    onChange={(e) => handleLeapYearRuleChange(e.target.value)}
+                  />
                 </Form.Group>
+                
+                {/* --- Custom Rule Options --- */}
                 {localSettings.leapYearRule === 'custom' && (
-                  <Form.Group>
-                    <Form.Label>Leap Year Frequency (years)</Form.Label>
-                    <Form.Control
-                      type="number"
-                      value={localSettings.leapYearOffset}
-                      onChange={(e) => handleLeapYearOffsetChange(e.target.value)}
-                      min="1"
-                    />
-                    <Form.Text className="text-muted">
-                      A leap year will occur every {localSettings.leapYearOffset} years
-                    </Form.Text>
-                  </Form.Group>
+                  <>
+                    <Form.Group as={Row} className="mb-3 align-items-center">
+                      <Form.Label column sm={3}>Leap Year Interval:</Form.Label>
+                      <Col sm={4}>
+                        <InputGroup size="sm">
+                            <InputGroup.Text>Every</InputGroup.Text>
+                            <Form.Control 
+                                type="number" 
+                                min="1" 
+                                value={localSettings.leapYearOffset}
+                                onChange={(e) => handleLeapYearOffsetChange(e.target.value)} 
+                                placeholder="e.g., 4"
+                             />
+                            <InputGroup.Text>years</InputGroup.Text>
+                        </InputGroup>
+                         <Form.Text>The interval (e.g., 4) for the custom rule.</Form.Text>
+                      </Col>
+                    </Form.Group>
+
+                    {/* --- NEW Leap Day Month Selector --- */}
+                    <Form.Group as={Row} className="mb-3 align-items-center">
+                        <Form.Label column sm={3}>Add Leap Day To:</Form.Label>
+                        <Col sm={5}>
+                            <Form.Select 
+                                aria-label="Month to add leap day"
+                                value={localSettings.leapDayMonthIndex === undefined ? 1 : localSettings.leapDayMonthIndex}
+                                onChange={(e) => handleLeapDayMonthChange(e.target.value)}
+                                disabled={(localSettings.monthNames || []).length === 0}
+                                size="sm"
+                              >
+                                {(localSettings.monthNames || []).map((month, index) => (
+                                  <option key={index} value={index}>{month}</option>
+                                ))}
+                              </Form.Select>
+                              <Form.Text>Select the month that gets an extra day in a leap year.</Form.Text>
+                        </Col>
+                    </Form.Group>
+                  </>
                 )}
-                {localSettings.leapYearRule === 'standard' && (
-                  <Alert variant="info">
-                    Using Earth's leap year rules: Years divisible by 4 are leap years, 
-                    except years divisible by 100 but not by 400.
-                  </Alert>
-                )}
+                 {/* --- Standard Rule Info --- */}
+                 {localSettings.leapYearRule === 'standard' && (
+                     <Alert variant="info" size="sm">
+                         Standard leap day is added to the second month (like February).
+                     </Alert>
+                 )}
               </Card.Body>
             </Card>
           </Tab>
+
+          {/* Eras Tab */}
           <Tab eventKey="eras" title="Eras">
             <ErasSettingsTab 
               eras={localSettings.eras || []} 
               onChange={handleErasChange} 
-              errors={errors}
+              errors={errors} // Pass down errors object
             />
           </Tab>
+          
+          {/* Templates Tab (Moved to end) */}
+           <Tab eventKey="templates" title="Templates">
+             <Card>
+               <Card.Header>Load Calendar Template</Card.Header>
+               <Card.Body>
+                 <p className="text-muted small mb-2">
+                   Load settings from a standard calendar template. This will overwrite current day, month, and leap year settings but preserve Eras.
+                 </p>
+                 <Stack direction="horizontal" gap={2}>
+                   <Button variant="outline-secondary" size="sm" onClick={() => loadTemplate(gregorianTemplate)}>
+                     <FontAwesomeIcon icon={faUndo} className="me-1" /> Load Gregorian
+                   </Button>
+                   <Button variant="outline-secondary" size="sm" onClick={() => loadTemplate(harptosTemplate)}>
+                     <FontAwesomeIcon icon={faUndo} className="me-1" /> Load Harptos (Forgotten Realms)
+                   </Button>
+                 </Stack>
+               </Card.Body>
+             </Card>
+           </Tab>
         </Tabs>
       </Modal.Body>
-      <Modal.Footer>
+       <Modal.Footer>
+         {Object.keys(errors).length > 0 && (
+             <Col className="text-danger me-auto">
+                 Please fix the validation errors before saving.
+             </Col>
+         )}
         <Button variant="secondary" onClick={onHide}>
           Cancel
         </Button>
-        <Button
-          variant="primary"
-          onClick={handleSave}
-          disabled={loading}
-        >
+        <Button variant="primary" onClick={handleSave} disabled={loading || Object.keys(errors).length > 0}>
           {loading ? 'Saving...' : 'Save Changes'}
         </Button>
       </Modal.Footer>

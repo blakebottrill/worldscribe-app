@@ -95,25 +95,29 @@ export function CalendarProvider({ children }) {
 
   const getDaysInMonth = (month, year) => {
     if (month === null || month === undefined || month < 0 || month >= calendarSettings.monthNames.length) {
-      return 30; // Default value
+      console.warn("[getDaysInMonth] Invalid month index:", month);
+      return 30; // Default value or throw error?
     }
     
-    if (month === 1) { // February
-      if (calendarSettings.leapYearRule === 'standard') {
-        // Standard leap year rules
-        return ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0) 
-          ? 29 : calendarSettings.daysPerMonth[month];
-      } else if (calendarSettings.leapYearRule === 'custom') {
-        // Custom leap year rules
-        return (year % calendarSettings.leapYearOffset === 0) 
-          ? 29 : calendarSettings.daysPerMonth[month];
-      } else {
-        // No leap years
-        return calendarSettings.daysPerMonth[month];
-      }
+    const baseDays = calendarSettings.daysPerMonth[month];
+    const leapMonthIndex = calendarSettings.leapDayMonthIndex === undefined ? 1 : calendarSettings.leapDayMonthIndex;
+    let isLeap = false;
+
+    // Determine if it's a leap year
+    if (calendarSettings.leapYearRule === 'standard') {
+       isLeap = ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0);
+    } else if (calendarSettings.leapYearRule === 'custom') {
+       // Handle year 0 and negative years carefully if offset is involved
+       // Assuming offset is positive for simplicity here.
+       isLeap = (year % calendarSettings.leapYearOffset === 0);
+    } // 'none' means isLeap remains false
+
+    // Add leap day if it's a leap year AND the current month is the designated leap month
+    if (isLeap && month === leapMonthIndex) {
+      return baseDays + 1;
+    } else {
+      return baseDays;
     }
-    
-    return calendarSettings.daysPerMonth[month];
   };
 
   return (
