@@ -1,23 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button, Modal, Form, Card, Row, Col, Tab, Tabs, Alert } from 'react-bootstrap';
 import { useCalendar } from '../contexts/CalendarContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlusCircle, faMinusCircle, faCalendarAlt } from '@fortawesome/free-solid-svg-icons';
 import './CalendarSettings.css';
+import ErasSettingsTab from './settings/ErasSettingsTab';
 
 const CalendarSettings = ({ show, onHide }) => {
   const { calendarSettings, saveCalendarSettings, loading } = useCalendar();
-  const [localSettings, setLocalSettings] = useState(calendarSettings);
+  const initialSettings = useMemo(() => ({
+      ...calendarSettings,
+      eras: calendarSettings.eras || [] 
+  }), [calendarSettings]);
+
+  const [localSettings, setLocalSettings] = useState(initialSettings);
   const [activeTab, setActiveTab] = useState('days');
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
-    setLocalSettings(calendarSettings);
+    setLocalSettings({
+        ...calendarSettings,
+        eras: calendarSettings.eras || []
+    });
   }, [calendarSettings, show]);
 
   const handleSave = async () => {
     if (validateSettings()) {
-      await saveCalendarSettings(localSettings);
+      const settingsToSave = {
+          ...localSettings,
+          eras: localSettings.eras || []
+      };
+      await saveCalendarSettings(settingsToSave);
       onHide();
     }
   };
@@ -45,6 +58,33 @@ const CalendarSettings = ({ show, onHide }) => {
       newErrors.daysPerMonth = 'Each month must have at least 1 day';
     }
     
+    // --- Add Era Validation ---
+    if (localSettings.eras && localSettings.eras.length > 0) {
+        localSettings.eras.forEach((era, index) => {
+            if (!era.name?.trim()) {
+                newErrors[`era_name_${index}`] = `Era #${index + 1} must have a name.`;
+            }
+            if (!era.startDate) {
+                newErrors[`era_start_${index}`] = `Era #${index + 1} must have a start date.`;
+            }
+            if (!era.endDate) {
+                newErrors[`era_end_${index}`] = `Era #${index + 1} must have an end date.`;
+            }
+            // Basic date order check (can be enhanced in ErasSettingsTab)
+            if (era.startDate && era.endDate) {
+                 // TODO: Use dateToDayNumber for accurate comparison if available?
+                 // Simple check for now:
+                 if (era.startDate.year > era.endDate.year || 
+                     (era.startDate.year === era.endDate.year && era.startDate.month > era.endDate.month) || 
+                     (era.startDate.year === era.endDate.year && era.startDate.month === era.endDate.month && era.startDate.day > era.endDate.day))
+                 {
+                      newErrors[`era_order_${index}`] = `Era #${index + 1}: End date must be after start date.`;
+                 }
+            }
+            // Check for overlapping eras? (More complex, maybe defer)
+        });
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -124,6 +164,14 @@ const CalendarSettings = ({ show, onHide }) => {
     }));
   };
 
+  // --- Handler for updating eras (passed down to ErasSettingsTab) ---
+  const handleErasChange = (newEras) => {
+      setLocalSettings(prev => ({
+          ...prev,
+          eras: newEras
+      }));
+  };
+
   return (
     <Modal
       show={show}
@@ -142,7 +190,9 @@ const CalendarSettings = ({ show, onHide }) => {
         <Tabs
           activeKey={activeTab}
           onSelect={(k) => setActiveTab(k)}
+          id="calendar-settings-tabs"
           className="mb-3"
+          fill
         >
           <Tab eventKey="days" title="Days of Week">
             <Card>
@@ -268,6 +318,13 @@ const CalendarSettings = ({ show, onHide }) => {
                 )}
               </Card.Body>
             </Card>
+          </Tab>
+          <Tab eventKey="eras" title="Eras">
+            <ErasSettingsTab 
+              eras={localSettings.eras || []} 
+              onChange={handleErasChange} 
+              errors={errors}
+            />
           </Tab>
         </Tabs>
       </Modal.Body>

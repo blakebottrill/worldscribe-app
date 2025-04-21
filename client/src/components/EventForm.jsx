@@ -77,10 +77,21 @@ const EventForm = ({ show, onHide, event = null, onEventSaved, onDelete, article
   };
   
   const handleDateChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData(prev => {
+      const newState = {
+        ...prev,
+        [field]: value
+      };
+      
+      // NEW: If setting startDate and endDate is null, set endDate too.
+      if (field === 'startDate' && !prev.endDate) {
+        newState.endDate = value; 
+      }
+
+      // Existing useEffect handles case where new startDate > existing endDate.
+      
+      return newState;
+    });
   };
   
   const handleLinkClick = () => {
@@ -220,6 +231,7 @@ const EventForm = ({ show, onHide, event = null, onEventSaved, onDelete, article
                   onChange={(date) => handleDateChange('endDate', date)}
                   id="event-end-date"
                   minDate={formData.startDate}
+                  initialViewDate={formData.startDate}
                   disabled={loading}
                 />
               </Col>

@@ -16,14 +16,15 @@ const DatePicker = ({
   id,
   isInvalid,
   invalidMessage,
-  minDate = null
+  minDate = null,
+  initialViewDate = null
 }) => {
   const { formatDate } = useCalendar();
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDate, setSelectedDate] = useState(value || null);
   const target = useRef(null);
   const calendarRef = useRef(null);
-  const [calendarPosition, setCalendarPosition] = useState({ top: 0, left: 0 });
+  const [calendarPosition, setCalendarPosition] = useState({ top: 0, left: 0, width: 0 });
   
   useEffect(() => {
     // Update selectedDate if value changes externally
@@ -58,13 +59,16 @@ const DatePicker = ({
   
   useEffect(() => {
     if (showCalendar && target.current) {
-      const inputHeight = target.current.offsetHeight;
+      // Get position relative to the viewport
+      const rect = target.current.getBoundingClientRect();
       
-      // Position below the input field, relative to the container
-      const top = inputHeight + 5; // Add 5px margin
-      const left = 0; // Align with the left edge of the container
-
-      setCalendarPosition({ top, left });
+      // Position below the input field, relative to the viewport
+      const top = rect.bottom + 5; // 5px below the input
+      const left = rect.left; // Align with left edge of input
+      // Get width of the input field to match calendar width
+      const width = rect.width;
+      
+      setCalendarPosition({ top, left, width });
     }
   }, [showCalendar]); // Recalculate when calendar visibility changes
   
@@ -130,22 +134,24 @@ const DatePicker = ({
         </div>
       )}
       
-      {/* Render Calendar directly, outside Overlay, as Overlay causes focus issues */}
+      {/* Render Calendar container with fixed position relative to viewport */}
       {showCalendar && (
         <div 
           ref={calendarRef} 
           id="date-picker-calendar-container" 
           className="date-picker-popover" // Use popover styling class
           style={{ 
-            position: 'absolute', 
-            zIndex: 1050, 
+            position: 'fixed', 
+            zIndex: 9999, 
             top: `${calendarPosition.top}px`, 
-            left: `${calendarPosition.left}px` 
+            left: `${calendarPosition.left}px`,
+            width: `${calendarPosition.width}px`
           }} 
         >
           <Calendar
             onDateSelect={handleDateSelect}
             initialDate={selectedDate}
+            initialViewDate={initialViewDate || selectedDate}
             minDate={minDate}
           />
         </div>

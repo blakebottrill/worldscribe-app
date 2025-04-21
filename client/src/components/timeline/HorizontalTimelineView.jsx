@@ -524,6 +524,70 @@ const HorizontalTimelineView = ({
     return calculatedMarkers;
   }, [processedEvents, visibleRange.startDay, visibleDaySpan, calendarSettings, getDaysInMonth, formatDate]);
 
+  // --- NEW: Calculate Era Layouts (Memoized) ---
+  const eraLayouts = useMemo(() => {
+      if (!calendarSettings?.eras || calendarSettings.eras.length === 0) {
+          return [];
+      }
+      console.time("Timeline Era Calculation");
+
+      const paddingPercent = 3; // Match marker/event padding
+      const effectiveWidthPercent = 100 - (2 * paddingPercent);
+      const layouts = [];
+
+      calendarSettings.eras.forEach(era => {
+          const startDayNum = dateToDayNumber(era.startDate, calendarSettings, getDaysInMonth);
+          const endDayNum = dateToDayNumber(era.endDate, calendarSettings, getDaysInMonth);
+
+          if (startDayNum === null || endDayNum === null || startDayNum > endDayNum) {
+              console.warn(`Skipping invalid era: ${era.name}`, era);
+              return; // Skip eras with invalid or unordered dates
+          }
+
+          // Check if the era overlaps with the visible range at all
+          const overlaps = !(endDayNum < visibleRange.startDay || startDayNum > visibleRange.endDay);
+          if (!overlaps) {
+              return; // Don't include this era if it doesn't overlap
+          }
+
+          // Calculate start/end relative to visible range
+          const clampedStartDay = Math.max(startDayNum, visibleRange.startDay);
+          const clampedEndDay = Math.min(endDayNum, visibleRange.endDay);
+
+          const startOffsetDays = clampedStartDay - visibleRange.startDay;
+          const eraVisibleDurationDays = clampedEndDay - clampedStartDay + 1;
+
+          // Calculate position and width as percentages (similar to events)
+          const leftPercent = paddingPercent + ((visibleDaySpan > 0) ? (startOffsetDays / visibleDaySpan) * effectiveWidthPercent : 0);
+          let widthPercent = (visibleDaySpan > 0) ? (eraVisibleDurationDays / visibleDaySpan) * effectiveWidthPercent : 0;
+          
+          // Ensure minimum visual width for very short visible durations?
+          widthPercent = Math.max(widthPercent, 0.1); // Minimum 0.1% width? Adjust as needed
+          widthPercent = Math.min(widthPercent, 100 - leftPercent - paddingPercent); // Clamp to boundaries
+
+          // Determine if the era extends beyond the visible edges
+          const extendsLeft = startDayNum < visibleRange.startDay;
+          const extendsRight = endDayNum > visibleRange.endDay;
+
+          layouts.push({ 
+              id: era.id,
+              name: era.name,
+              style: {
+                  left: `${leftPercent}%`,
+                  width: `${widthPercent}%`,
+              },
+              extendsLeft,
+              extendsRight,
+          });
+      });
+      
+      // Optional: Sort eras? By start date?
+      // layouts.sort((a, b) => /* ... */ ); 
+
+      console.timeEnd("Timeline Era Calculation");
+      return layouts;
+  }, [calendarSettings?.eras, visibleRange.startDay, visibleRange.endDay, visibleDaySpan, calendarSettings, getDaysInMonth]);
+
   // Wheel Event Handler
   const handleWheel = (event) => {
       if (!containerRef.current) return;
@@ -1028,6 +1092,23 @@ const HorizontalTimelineView = ({
       style={{ '--total-lanes': totalLanes }}
       onMouseDown={handleMouseDown}
     >
+      {/* --- NEW: Render Eras Area --- */}
+      <div className="timeline-eras-area">
+          {eraLayouts.map(era => (
+              <div 
+                  key={era.id} 
+                  className={`timeline-era 
+                      ${era.extendsLeft ? 'era-extends-left' : ''}
+                      ${era.extendsRight ? 'era-extends-right' : ''}
+                  `}
+                  style={era.style}
+                  title={`${era.name} (Era)`} // Simple title
+              >
+                  <span className="timeline-era-label">{era.name}</span>
+              </div>
+          ))}
+      </div>
+
       {/* Render Refactored Markers (Labels Only) */} 
       <div className="timeline-markers-area">
         {markers.map((marker, index) => (

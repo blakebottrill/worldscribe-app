@@ -2,9 +2,8 @@
 
 .timeline-view-container {
   width: 100%;
-  overflow-x: auto; /* Enable horizontal scrolling */
   overflow-y: hidden; /* Hide vertical scrollbar if content fits */
-  padding: 40px 0; /* Increased vertical padding */
+  padding: 20px 0 40px 0; /* Adjust padding: less top, more bottom */
   background-color: var(--background-color, #1a202c); /* Dark background */
   border: 1px solid var(--border-color, #4a5568);
   position: relative; /* Needed for absolute positioning of items */
@@ -68,6 +67,50 @@
   top: 37px; /* Position line within the first lane's space (roughly) */
   left: 0;
   z-index: 0; /* Ensure it's behind items */
+}
+
+.timeline-eras-area {
+  position: relative;
+  width: 100%;
+  height: 30px; /* Height for the eras bar */
+  margin-bottom: 8px; /* Space between eras and markers */
+  overflow: hidden; /* Clip eras extending beyond edges */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* Separator line */
+}
+
+.timeline-era {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background-color: rgba(100, 120, 150, 0.5); /* Default era color (adjust as needed) */
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-left: 1px solid rgba(255, 255, 255, 0.3);
+  border-right: 1px solid rgba(255, 255, 255, 0.3);
+  box-sizing: border-box;
+}
+
+/* Style for eras extending beyond view */
+.timeline-era.era-extends-left {
+  border-left: 2px dashed rgba(255, 255, 255, 0.5);
+}
+
+.timeline-era.era-extends-right {
+  border-right: 2px dashed rgba(255, 255, 255, 0.5);
+}
+
+.timeline-era-label {
+  color: white;
+  font-size: 0.75rem;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 8px;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
 }
 
 .timeline-markers-area {

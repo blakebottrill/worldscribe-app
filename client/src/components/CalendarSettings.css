@@ -1,5 +1,7 @@
 .calendar-settings-modal .modal-content {
   border-radius: 8px;
+  max-height: 90vh;
+  overflow: visible;
 }
 
 .calendar-settings-modal .card {
@@ -9,6 +11,9 @@
 
 .calendar-settings-modal .tab-content {
   padding-top: 10px;
+  max-height: calc(80vh - 120px);
+  overflow-y: auto;
+  position: relative;
 }
 
 .calendar-settings-modal .btn-danger {
@@ -33,4 +38,9 @@
 
 .calendar-settings-modal .form-text {
   font-size: 0.8rem;
+}
+
+.calendar-settings-modal .date-picker-container {
+  position: relative;
+  overflow: visible;
 } 

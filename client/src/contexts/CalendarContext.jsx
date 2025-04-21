@@ -70,7 +70,9 @@ export function CalendarProvider({ children }) {
     const day = date.day !== undefined ? date.day : 1;
     const year = date.year !== undefined ? date.year : 1;
     
-    return `${day} ${calendarSettings.monthNames[month]} ${year}`;
+    // Format: [Month] [Day], [Year]
+    const monthName = calendarSettings.monthNames[month] || 'Unknown Month';
+    return `${monthName} ${day}, ${year}`;
   };
 
   const formatDay = (day, month, year) => {

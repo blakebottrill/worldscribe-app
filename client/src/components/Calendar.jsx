@@ -6,7 +6,12 @@ import { useCalendar } from '../contexts/CalendarContext';
 import './Calendar.css';
 import { dateToDayNumber } from '../utils/calendarUtils';
 
-const Calendar = ({ onDateSelect, initialDate, minDate = null }) => {
+const Calendar = ({ 
+  onDateSelect, 
+  initialDate,
+  initialViewDate,
+  minDate = null 
+}) => {
   const { 
     calendarSettings, 
     loading,
@@ -14,8 +19,11 @@ const Calendar = ({ onDateSelect, initialDate, minDate = null }) => {
     formatMonth,
   } = useCalendar();
   
-  const [currentYear, setCurrentYear] = useState(initialDate?.year || 1);
-  const [currentMonth, setCurrentMonth] = useState(initialDate?.month || 0);
+  const defaultViewYear = initialViewDate?.year ?? initialDate?.year ?? 1;
+  const defaultViewMonth = initialViewDate?.month ?? initialDate?.month ?? 0;
+
+  const [currentYear, setCurrentYear] = useState(defaultViewYear);
+  const [currentMonth, setCurrentMonth] = useState(defaultViewMonth);
   const [selectedDate, setSelectedDate] = useState(initialDate || null);
   
   const [calendarDays, setCalendarDays] = useState([]);
@@ -39,6 +47,12 @@ const Calendar = ({ onDateSelect, initialDate, minDate = null }) => {
         setYearInputValue(String(currentYear));
     }
   }, [currentYear]);
+  
+  useEffect(() => {
+    if (initialDate !== undefined) {
+      setSelectedDate(initialDate);
+    }
+  }, [initialDate]);
   
   const generateCalendarDays = () => {
     if (!calendarSettings) return;
