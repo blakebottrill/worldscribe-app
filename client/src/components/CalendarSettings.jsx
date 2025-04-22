@@ -2,7 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Button, Modal, Form, Card, Row, Col, Tab, Tabs, Alert, Stack, InputGroup } from 'react-bootstrap';
 import { useCalendar } from '../contexts/CalendarContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlusCircle, faMinusCircle, faCalendarAlt, faUndo } from '@fortawesome/free-solid-svg-icons';
+import { 
+  faPlusCircle, 
+  faMinusCircle, 
+  faCalendarAlt, 
+  faUndo, 
+  faArrowUp, 
+  faArrowDown 
+} from '@fortawesome/free-solid-svg-icons';
 import './CalendarSettings.css';
 import ErasSettingsTab from './settings/ErasSettingsTab';
 
@@ -237,6 +244,51 @@ const CalendarSettings = ({ show, onHide }) => {
       }));
   };
 
+  // Add new handlers for reordering days and months
+  const handleMoveItemUp = (index, arrayName, secondArrayName = null) => {
+    if (index <= 0) return; // Can't move first item up
+    
+    setLocalSettings(prev => {
+      // Make copy of the array we're modifying
+      const array = [...prev[arrayName]];
+      
+      // Swap with item above
+      [array[index - 1], array[index]] = [array[index], array[index - 1]];
+      
+      // If we have a second array to keep in sync (like daysPerMonth)
+      const result = { ...prev, [arrayName]: array };
+      if (secondArrayName && prev[secondArrayName]) {
+        const secondArray = [...prev[secondArrayName]];
+        [secondArray[index - 1], secondArray[index]] = [secondArray[index], secondArray[index - 1]];
+        result[secondArrayName] = secondArray;
+      }
+      
+      return result;
+    });
+  };
+
+  const handleMoveItemDown = (index, arrayName, secondArrayName = null) => {
+    setLocalSettings(prev => {
+      const array = [...prev[arrayName]];
+      
+      // Don't move if it's the last item
+      if (index >= array.length - 1) return prev;
+      
+      // Swap with item below
+      [array[index], array[index + 1]] = [array[index + 1], array[index]];
+      
+      // If we have a second array to keep in sync
+      const result = { ...prev, [arrayName]: array };
+      if (secondArrayName && prev[secondArrayName]) {
+        const secondArray = [...prev[secondArrayName]];
+        [secondArray[index], secondArray[index + 1]] = [secondArray[index + 1], secondArray[index]];
+        result[secondArrayName] = secondArray;
+      }
+      
+      return result;
+    });
+  };
+
   return (
     <Modal
       show={show}
@@ -274,6 +326,29 @@ const CalendarSettings = ({ show, onHide }) => {
                 {errors.dayNames && <Alert variant="danger" size="sm">{errors.dayNames}</Alert>}
                 {(localSettings.dayNames || []).map((day, index) => (
                   <InputGroup key={index} className="mb-2">
+                    {/* Add move up/down buttons */}
+                    <div className="d-flex flex-column me-1" style={{ justifyContent: "center" }}>
+                      <Button 
+                        variant="outline-secondary" 
+                        size="sm" 
+                        className="p-0 border-0 mb-1" 
+                        style={{ width: '24px', height: '24px' }}
+                        onClick={() => handleMoveItemUp(index, 'dayNames')}
+                        disabled={index === 0}
+                      >
+                        <FontAwesomeIcon icon={faArrowUp} size="xs" />
+                      </Button>
+                      <Button 
+                        variant="outline-secondary" 
+                        size="sm" 
+                        className="p-0 border-0" 
+                        style={{ width: '24px', height: '24px' }}
+                        onClick={() => handleMoveItemDown(index, 'dayNames')}
+                        disabled={index === (localSettings.dayNames || []).length - 1}
+                      >
+                        <FontAwesomeIcon icon={faArrowDown} size="xs" />
+                      </Button>
+                    </div>
                     <Form.Control
                       type="text"
                       value={day}
@@ -318,6 +393,31 @@ const CalendarSettings = ({ show, onHide }) => {
                 {errors.daysPerMonth && <Alert variant="danger" size="sm">{errors.daysPerMonth}</Alert>}
                 {(localSettings.monthNames || []).map((month, index) => (
                   <Row key={index} className="mb-2 gx-2 align-items-center">
+                    {/* Add move up/down buttons */}
+                    <Col xs="auto" className="pe-0">
+                      <div className="d-flex flex-column">
+                        <Button 
+                          variant="outline-secondary" 
+                          size="sm" 
+                          className="p-0 border-0 mb-1" 
+                          style={{ width: '24px', height: '24px' }}
+                          onClick={() => handleMoveItemUp(index, 'monthNames', 'daysPerMonth')}
+                          disabled={index === 0}
+                        >
+                          <FontAwesomeIcon icon={faArrowUp} size="xs" />
+                        </Button>
+                        <Button 
+                          variant="outline-secondary" 
+                          size="sm" 
+                          className="p-0 border-0" 
+                          style={{ width: '24px', height: '24px' }}
+                          onClick={() => handleMoveItemDown(index, 'monthNames', 'daysPerMonth')}
+                          disabled={index === (localSettings.monthNames || []).length - 1}
+                        >
+                          <FontAwesomeIcon icon={faArrowDown} size="xs" />
+                        </Button>
+                      </div>
+                    </Col>
                     <Col>
                       <Form.Control
                         type="text"
